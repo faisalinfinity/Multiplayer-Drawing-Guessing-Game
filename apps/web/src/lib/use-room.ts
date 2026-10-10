@@ -18,6 +18,7 @@ export function useRoom(roomId: string, enabled: boolean) {
   const [error, setError] = useState('');
   const [offset, setOffset] = useState(0);
   const [kicked, setKicked] = useState(false);
+  const [kickMessage, setKickMessage] = useState('The host removed you from this room.');
   const sync = useCallback(() => { syncPending.current = true; socket.current?.emit('sync'); }, []);
 
   useEffect(() => {
@@ -47,11 +48,11 @@ export function useRoom(roomId: string, enabled: boolean) {
       const next = [...previous, event]; eventsRef.current = next; setEvents(next);
     });
     client.on('status', (status: { recovering: boolean; message?: string }) => { setRecovering(status.recovering); if (status.recovering && status.message) setError(status.message); else setError(''); });
-    client.on('kicked', () => { setKicked(true); setConnected(false); client.disconnect(); });
+    client.on('kicked', (value?: { message?: string }) => { setKickMessage(value?.message || 'Your connection to this room has ended.'); setKicked(true); setConnected(false); client.disconnect(); });
     return () => { client.disconnect(); socket.current = null; stateRef.current = null; eventsRef.current = []; };
   }, [roomId, enabled, sync]);
 
-  const command = useCallback((value: Command, id = crypto.randomUUID()): Promise<Ack> => new Promise(resolve => {
+  const command = useCallback((value: Command, id: string = crypto.randomUUID()): Promise<Ack> => new Promise(resolve => {
     const client = socket.current;
     if (!client?.connected) { resolve({ ok: false, error: 'You’re reconnecting. Please try again in a moment.' }); return; }
     client.timeout(8000).emit('command', { id, command: value }, (err: Error | null, result: Ack) => {
@@ -59,5 +60,5 @@ export function useRoom(roomId: string, enabled: boolean) {
       else resolve(result);
     });
   }), [sync]);
-  return { room, privateState, events, playerId, connected, recovering, error, offset, kicked, command, sync };
+  return { room, privateState, events, playerId, connected, recovering, error, offset, kicked, kickMessage, command, sync };
 }

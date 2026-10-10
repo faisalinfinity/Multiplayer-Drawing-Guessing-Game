@@ -148,7 +148,13 @@ export function DrawingCanvas({ events, turnId, canDraw, onDraw, disabled = fals
 
   useEffect(() => {
     const interval = window.setInterval(() => flush(), 33);
-    return () => { window.clearInterval(interval); if (frameRef.current !== null) cancelAnimationFrame(frameRef.current); };
+    return () => {
+      window.clearInterval(interval);
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      // React Strict Mode replays effect setup after cleanup. A cancelled frame must
+      // release its scheduling slot or every later paint will be skipped.
+      frameRef.current = null;
+    };
   }, [flush]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { HEIGHT, WIDTH, type DrawingEvent, type DrawingOp, type Point } from './index.js';
+import { HEIGHT, WIDTH, type DrawingEvent, type DrawingOp, type Point } from './index';
 
 type Stroke = Extract<DrawingOp, { type: 'stroke' }>;
 type Action = { kind: 'stroke'; id: string; chunks: Stroke[] } | { kind: 'single'; op: Exclude<DrawingOp, Stroke | { type: 'undo' }> };
