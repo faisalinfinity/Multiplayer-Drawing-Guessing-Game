@@ -75,7 +75,7 @@ export class GameStore {
   }
   async roomIds() { return this.journal.distinct('roomId', { at: { $gt: Date.now() - 3600000 } }); }
   async replay(roomId: string, gameId: string): Promise<ReplayIndex | null> {
-    const entries = await this.journal.find({ roomId, gameId, kind: 'state', effects: { $exists: true }, expiresAt: { $gt: new Date() } }).sort({ seq: 1 }).toArray();
+    const entries = await this.journal.find({ roomId, gameId, kind: 'state', 'effects.0': { $exists: true }, expiresAt: { $gt: new Date() } }, { projection: { effects: 1 } }).sort({ seq: 1 }).toArray();
     const effects = entries.flatMap(e => e.effects ?? []);
     const finish = effects.find(e => e.type === 'game-ended');
     if (!finish || finish.type !== 'game-ended') return null;

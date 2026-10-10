@@ -12,7 +12,7 @@ services:
   server:
     build: { context: ., target: server }
     environment:
-      MONGODB_URI: mongodb://mongo:27017/doodleroom
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/doodleroom}
       ORIGIN: ${ORIGIN:-http://localhost:3000}
       NODE_ENV: production
       COOKIE_SECURE: ${COOKIE_SECURE:-false}

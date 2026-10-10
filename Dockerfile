@@ -16,7 +16,11 @@ COPY --from=web-build --chown=node:node /app/apps/web/.next/standalone ./
 COPY --from=web-build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
 USER node
 CMD ["node", "apps/web/server.js"]
-FROM base AS server
+FROM base AS server-build
+RUN pnpm --filter @doodle/server --prod deploy /server
+FROM node:24-bookworm-slim AS server
+WORKDIR /app
 ENV NODE_ENV=production PORT=4000
+COPY --from=server-build --chown=node:node /server ./
 USER node
-CMD ["pnpm", "--filter", "@doodle/server", "start"]
+CMD ["node", "node_modules/tsx/dist/cli.mjs", "src/index.ts"]

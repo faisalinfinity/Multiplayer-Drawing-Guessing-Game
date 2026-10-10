@@ -1,0 +1,15 @@
+# Isolated benchmark: docker compose -p doodleroom-benchmark -f compose.yaml -f compose.benchmark.yaml up --build -d mongo server
+services:
+  mongo:
+    cpus: 1
+    mem_limit: 1g
+  server:
+    cpus: 1
+    mem_limit: 768m
+    ports: ["127.0.0.1:5100:4000"]
+    environment:
+      ORIGIN: http://localhost:5100
+      ENABLE_METRICS: "true"
+      HTTP_RATE: 1000
+      SOCKET_CONNECTION_RATE: 1000
+      ROOM_CREATE_RATE: 1000
