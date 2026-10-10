@@ -12,6 +12,7 @@ interface Actor {
   state: EngineState; seq: number; drawing: DrawingEvent[]; bytes: number;
   queue: Promise<unknown>; pending: number; recovering: boolean; lastCheckpoint: number;
   receipts: Map<string, Ack>; sockets: Map<string, Socket>; joining: Map<string, Socket>; offlineAt: Map<string, number>;
+  drawingReceipts: Map<string, Ack>;
   stroke: { id: string; index: number; points: number; tool: string; color: string; size: number } | null;
   strokeIds: Set<string>;
 }
@@ -34,7 +35,7 @@ export async function buildServer(options: ServerOptions) {
     cors: { origin: [...origins], credentials: true },
     allowRequest: (request, callback) => callback(null, origins.has(request.headers.origin ?? '')),
   });
-  const makeActor = (state: EngineState, seq = 0, drawing: DrawingEvent[] = []): Actor => ({ state, seq, drawing, bytes: Buffer.byteLength(JSON.stringify(drawing)), queue: Promise.resolve(), pending: 0, recovering: false, lastCheckpoint: 0, receipts: new Map(), sockets: new Map(), joining: new Map(), offlineAt: new Map(), stroke: null, strokeIds: new Set(drawing.flatMap(e => e.op.type === 'stroke' ? [e.op.strokeId] : [])) });
+  const makeActor = (state: EngineState, seq = 0, drawing: DrawingEvent[] = []): Actor => ({ state, seq, drawing, bytes: Buffer.byteLength(JSON.stringify(drawing)), queue: Promise.resolve(), pending: 0, recovering: false, lastCheckpoint: 0, receipts: new Map(), drawingReceipts: new Map(drawing.map(event => [event.commandId, { ok: true, seq: event.seq }])), sockets: new Map(), joining: new Map(), offlineAt: new Map(), stroke: null, strokeIds: new Set(drawing.flatMap(e => e.op.type === 'stroke' ? [e.op.strokeId] : [])) });
   function hasAuthority() {
     if (closing || !store.hasLease()) { leaseHealthy = false; return false; }
     return leaseHealthy;
@@ -68,6 +69,7 @@ export async function buildServer(options: ServerOptions) {
     const loaded = await store.load(actor.state.id);
     if (!loaded) throw new Error('Room could not be restored');
     actor.state = loaded.state; actor.seq = loaded.seq; actor.drawing = loaded.drawing;
+    actor.drawingReceipts = new Map(actor.drawing.map(event => [event.commandId, { ok: true, seq: event.seq }]));
     actor.bytes = Buffer.byteLength(JSON.stringify(actor.drawing)); actor.stroke = null;
     actor.strokeIds = new Set(actor.drawing.flatMap(e => e.op.type === 'stroke' ? [e.op.strokeId] : []));
     // A failed disconnect write must not resurrect a transport that no longer exists.
@@ -116,7 +118,7 @@ export async function buildServer(options: ServerOptions) {
     }
     assertAuthority();
     actor.state = next; actor.seq = seq;
-    if (previousTurn !== next.turn?.id) { actor.drawing = []; actor.bytes = 0; actor.stroke = null; actor.strokeIds.clear(); }
+    if (previousTurn !== next.turn?.id) { actor.drawing = []; actor.drawingReceipts.clear(); actor.bytes = 0; actor.stroke = null; actor.strokeIds.clear(); }
     if (changed) publish(actor);
     if (Date.now() - actor.lastCheckpoint > 30000 || result.effects.length > 0) {
       actor.lastCheckpoint = Date.now();
@@ -153,6 +155,7 @@ export async function buildServer(options: ServerOptions) {
     if (!saved.inserted) { if (saved.entry.seq > actor.seq) await recover(actor); return saved.entry.ack; }
     const duration = performance.now() - start; metrics.commits++; metrics.durableMsTotal += duration; metrics.durableMsMax = Math.max(metrics.durableMsMax, duration);
     actor.seq = entry.seq; actor.drawing.push(event); actor.bytes += size; actor.stroke = nextStroke;
+    actor.drawingReceipts.set(commandId, ack);
     if (op.type === 'stroke') actor.strokeIds.add(op.strokeId);
     metrics.drawingBatches++;
     io.to(actor.state.id).emit('drawing', event);
@@ -287,9 +290,18 @@ export async function buildServer(options: ServerOptions) {
         if (actor.sockets.get(player.id) !== socket || !socket.connected) return { ok: false, error: 'This session is no longer active.', code: 'SESSION' } as Ack;
         const prior = actor.receipts.get(key); if (prior) return prior;
         if (actor.recovering || !hasAuthority()) return { ok: false, error: 'Reconnecting to storage. Please wait.', code: 'RECOVERING' } as Ack;
-        const durableReceipt = await store.journal.findOne({ roomId: actor.state.id, actorId: player.id, commandId: envelope.id }, { projection: { ack: 1 } });
-        if (durableReceipt) { actor.receipts.set(key, durableReceipt.ack); return durableReceipt.ack; }
         const command = envelope.command;
+        // This complete turn-local index is rebuilt from the durable journal on recovery.
+        // New current-turn strokes need only the journal write, not a read-before-write.
+        const currentDrawer = command.type === 'draw' && actor.state.phase === 'drawing'
+          && command.turnId === actor.state.turn?.id && actor.state.turn.drawerId === player.id;
+        if (currentDrawer) {
+          const drawingReceipt = actor.drawingReceipts.get(envelope.id);
+          if (drawingReceipt) return drawingReceipt;
+        } else {
+          const durableReceipt = await store.journal.findOne({ roomId: actor.state.id, actorId: player.id, commandId: envelope.id }, { projection: { ack: 1 } });
+          if (durableReceipt) { actor.receipts.set(key, durableReceipt.ack); return durableReceipt.ack; }
+        }
         const result = command.type === 'draw' ? await draw(actor, player.id, envelope.id, command.turnId, command.op, now) : await commit(actor, applyCommand(actor.state, player.id, command, now), player.id, envelope.id);
         actor.receipts.set(key, result); if (actor.receipts.size > 10000) actor.receipts.delete(actor.receipts.keys().next().value!);
         if (command.type === 'leave' && result.ok) { actor.sockets.delete(player.id); socket.leave(actor.state.id); }
