@@ -282,6 +282,14 @@ function depart(state: EngineState, player: EnginePlayer, now: number, effects: 
 
 /** No-op returns the same state object, so timer polling never produces idle writes. */
 export function advance(state: EngineState, now: number, random: Random = secureRandom): EngineResult {
+  // Drawing batches arrive ~30 times/second. Copying the entire chat and word list
+  // on every batch makes cost grow with room history, even when no timer is due.
+  const wakeAt = nextWakeAt(state);
+  const needsHost = !state.players.some(player => player.id === state.hostId && !player.departed)
+    && state.players.some(player => player.connected && !player.departed);
+  const canResume = state.phase === 'waiting'
+    && state.players.filter(player => player.connected && !player.departed).length >= 2;
+  if (!needsHost && !canResume && (wakeAt === null || now < wakeAt)) return { state, effects: [] };
   const draft = structuredClone(state);
   const effects: EngineEffect[] = [];
   let dirty = false;
