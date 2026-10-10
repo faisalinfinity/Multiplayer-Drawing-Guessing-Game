@@ -9,6 +9,7 @@ export function useRoom(roomId: string, enabled: boolean) {
   const stateRef = useRef<PublicRoom | null>(null);
   const eventsRef = useRef<DrawingEvent[]>([]);
   const syncPending = useRef(false);
+  const syncRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [room, setRoom] = useState<PublicRoom | null>(null);
   const [privateState, setPrivateState] = useState<PrivateState>({});
   const [events, setEvents] = useState<DrawingEvent[]>([]);
@@ -19,23 +20,39 @@ export function useRoom(roomId: string, enabled: boolean) {
   const [offset, setOffset] = useState(0);
   const [kicked, setKicked] = useState(false);
   const [kickMessage, setKickMessage] = useState('The host removed you from this room.');
-  const sync = useCallback(() => { syncPending.current = true; socket.current?.emit('sync'); }, []);
+  const sync = useCallback(() => {
+    if (syncPending.current || !socket.current?.connected) return;
+    syncPending.current = true;
+    const request = (attempt: number) => {
+      const client = socket.current;
+      if (!client?.connected) { syncPending.current = false; return; }
+      client.timeout(2500).emit('sync', (error: Error | null, result?: { ok: boolean }) => {
+        if (socket.current !== client || !syncPending.current) return;
+        if (syncRetry.current) clearTimeout(syncRetry.current);
+        if (attempt >= 4) { syncPending.current = false; setError('Canvas synchronization is taking longer than usual. Reconnecting…'); client.disconnect().connect(); return; }
+        // Retry both explicit backpressure and missing acknowledgements/snapshots.
+        syncRetry.current = setTimeout(() => request(attempt + 1), error || result?.ok === false ? Math.min(4000, 500 * 2 ** attempt) : 2500);
+      });
+    };
+    request(0);
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
     const client = io(process.env.NEXT_PUBLIC_SOCKET_URL || undefined, { path: '/socket.io', auth: { roomId }, withCredentials: true, transports: ['websocket', 'polling'], reconnectionDelay: 500, reconnectionDelayMax: 3000 });
     socket.current = client;
     client.on('connect', () => { setError(''); });
-    client.on('disconnect', () => { setConnected(false); });
+    client.on('disconnect', () => { setConnected(false); syncPending.current = false; if (syncRetry.current) clearTimeout(syncRetry.current); });
     client.on('connect_error', (err: Error) => { setConnected(false); setError(err.message || 'Connection interrupted. Reconnecting…'); });
     client.on('snapshot', (snapshot: Snapshot) => {
       if (stateRef.current && snapshot.state.version < stateRef.current.version) return;
       stateRef.current = snapshot.state; eventsRef.current = snapshot.drawing; syncPending.current = false;
+      if (syncRetry.current) clearTimeout(syncRetry.current);
       setRoom(snapshot.state); setEvents(snapshot.drawing); setPrivateState(snapshot.private); setPlayerId(snapshot.playerId); setOffset(snapshot.serverTime - Date.now()); setConnected(true); setError('');
     });
     client.on('state', ({ state, serverTime }: { state: PublicRoom; serverTime: number }) => {
       if (stateRef.current && state.version <= stateRef.current.version) return;
-      if (state.turn?.id !== stateRef.current?.turn?.id) { eventsRef.current = []; setEvents([]); setPrivateState(previous => ({ ...(previous.customWords ? { customWords: previous.customWords } : {}) })); }
+      if (state.turn?.id !== stateRef.current?.turn?.id) { syncPending.current = false; if (syncRetry.current) clearTimeout(syncRetry.current); eventsRef.current = []; setEvents([]); setPrivateState(previous => ({ ...(previous.customWords ? { customWords: previous.customWords } : {}) })); }
       stateRef.current = state; setRoom(state); setOffset(serverTime - Date.now());
     });
     client.on('private', (value: PrivateState) => setPrivateState(value));
@@ -49,7 +66,7 @@ export function useRoom(roomId: string, enabled: boolean) {
     });
     client.on('status', (status: { recovering: boolean; message?: string }) => { setRecovering(status.recovering); if (status.recovering && status.message) setError(status.message); else setError(''); });
     client.on('kicked', (value?: { message?: string }) => { setKickMessage(value?.message || 'Your connection to this room has ended.'); setKicked(true); setConnected(false); client.disconnect(); });
-    return () => { client.disconnect(); socket.current = null; stateRef.current = null; eventsRef.current = []; };
+    return () => { client.disconnect(); socket.current = null; stateRef.current = null; eventsRef.current = []; syncPending.current = false; if (syncRetry.current) clearTimeout(syncRetry.current); };
   }, [roomId, enabled, sync]);
 
   const command = useCallback((value: Command, id: string = crypto.randomUUID()): Promise<Ack> => new Promise(resolve => {

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import { INGRESS_BURST, socketClientAddress } from './limits.js';
 import { MongoClient } from 'mongodb';
 import { io, type Socket } from 'socket.io-client';
 import type { Ack, Command, DrawingEvent, PlayerIdentity, PrivateState, PublicRoom, Snapshot } from '@doodle/shared';
@@ -258,6 +260,131 @@ describe.skipIf(!mongoBase)('HTTP / Socket.IO / MongoDB integration', () => {
     const response = await fetch(`${base}/api/session`, { method: 'POST', headers: { origin: allowedOrigin, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'x'.repeat(20_000), avatar: 0 }) });
     expect(response.status).toBe(413);
     expect(game.host.state.players.every(player => player.score === 0)).toBe(true);
+  });
+
+  it('durably marks a disconnected transport offline after its original write fails', async () => {
+    const game = await room();
+    await choose(game.drawer, game.turnId);
+    const victim = game.host;
+    const observer = game.guessers[0]!;
+    const insert = server!.store.journal.insertOne.bind(server!.store.journal);
+    let failedDisconnect = false;
+    const fault = vi.spyOn(server!.store.journal, 'insertOne').mockImplementation(async (document, options) => {
+      if (!failedDisconnect && document.kind === 'state' && document.state?.players.find(player => player.id === victim.player.id)?.connected === false) {
+        failedDisconnect = true;
+        throw new Error('Storage unavailable before disconnect was committed');
+      }
+      return insert(document, options);
+    });
+    try {
+      const droppedAt = Date.now();
+      victim.socket.disconnect();
+      await until(() => failedDisconnect, 'disconnect write fault');
+      await until(() => observer.state.players.find(player => player.id === victim.player.id)?.connected === false, 'recovery removes the phantom connection');
+      const persisted = await server!.store.load(game.roomId);
+      const offline = persisted!.state.players.find(player => player.id === victim.player.id)!;
+      expect(offline.connected).toBe(false);
+      expect(offline.disconnectedAt).toBeGreaterThanOrEqual(droppedAt);
+      expect(offline.disconnectedAt).toBeLessThan(droppedAt + 1000);
+      expect(persisted!.state.turn?.id).toBe(game.turnId);
+      expect(persisted!.state.players.filter(player => player.connected)).toHaveLength(2);
+    } finally { fault.mockRestore(); }
+  });
+
+  it.each(['invalid', 'cached'] as const)('bounds %s command bursts before parsing or cached acknowledgements', async kind => {
+    const game = await room();
+    const sender = game.guessers[0]!;
+    const id = randomUUID();
+    const value: Command = { type: 'guess', text: 'ordinary lobby chat' };
+    if (kind === 'cached') expect((await command(sender, value, id)).ok).toBe(true);
+    const disconnected = new Promise<void>(resolve => sender.socket.once('disconnect', () => resolve()));
+    for (let index = 0; index < INGRESS_BURST + 100; index++) {
+      sender.socket.emit('command', kind === 'cached' ? { id, command: value } : { invalid: 'x'.repeat(1000) });
+    }
+    await disconnected;
+    expect(sender.socket.connected).toBe(false);
+    expect(await server!.store.journal.countDocuments({ roomId: game.roomId, actorId: sender.player.id, commandId: id })).toBe(kind === 'cached' ? 1 : 0);
+    expect(game.host.socket.connected).toBe(true);
+    expect(game.host.state.players.every(player => player.score === 0)).toBe(true);
+  });
+
+  it('retains completed participants replay access after lobby cleanup and enforces seven days if TTL cleanup failed', async () => {
+    const game = await room();
+    const gameId = game.host.state.gameId!;
+    let ttlFault: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      for (let turn = 0; turn < 3; turn++) {
+        await until(() => game.host.state.phase === 'choosing', 'next drawer');
+        const drawer = game.joined.find(peer => peer.player.id === game.host.state.turn!.drawerId)!;
+        await until(() => drawer.private.choices?.length === 3, 'drawer choices');
+        const word = drawer.private.choices![0]!;
+        const turnId = game.host.state.turn!.id;
+        await choose(drawer, turnId);
+        expect((await command(drawer, stroke(turnId))).ok).toBe(true);
+        if (turn === 2) ttlFault = vi.spyOn(server!.store.journal, 'updateMany').mockRejectedValueOnce(new Error('TTL cleanup temporarily unavailable'));
+        for (const guesser of game.joined.filter(peer => peer !== drawer)) {
+          expect((await command(guesser, { type: 'guess', turnId, text: word })).feedback).toBe('correct');
+        }
+        await until(() => game.host.state.phase === (turn === 2 ? 'results' : 'choosing'), 'reveal completes');
+      }
+      expect(ttlFault).toHaveBeenCalledTimes(1);
+      ttlFault?.mockRestore();
+      ttlFault = undefined;
+      const departed = game.guessers[0]!;
+      expect((await command(departed, { type: 'leave' })).ok).toBe(true);
+      expect((await command(game.host, { type: 'lobby' })).ok).toBe(true);
+      await until(() => game.host.state.phase === 'lobby', 'return to lobby');
+      expect(game.host.state.players.some(player => player.id === departed.player.id)).toBe(false);
+      const replayUrl = `${base}/api/rooms/${game.roomId}/games/${gameId}`;
+      const response = await fetch(replayUrl, { headers: { cookie: departed.cookie } });
+      expect(response.status).toBe(200);
+      const replay = await response.json() as { drawings: Array<{ turnId: string }> };
+      expect(replay.drawings).toHaveLength(3);
+      expect((await fetch(`${replayUrl}/turns/${replay.drawings[0]!.turnId}`, { headers: { cookie: departed.cookie } })).status).toBe(200);
+      const stranger = await session('Outside visitor');
+      expect((await fetch(replayUrl, { headers: { cookie: stranger.cookie } })).status).toBe(403);
+      // Simulate the retention boundary while deliberately leaving TTL dates in the future.
+      await server!.store.journal.updateMany({ roomId: game.roomId, gameId, 'effects.type': 'game-ended' }, { $set: { 'effects.$[ending].endedAt': Date.now() - 7 * 86400000 - 1 } }, { arrayFilters: [{ 'ending.type': 'game-ended' }] });
+      expect(await server!.store.replay(game.roomId, gameId)).toBeNull();
+      expect((await fetch(replayUrl, { headers: { cookie: game.host.cookie } })).status).toBe(404);
+    } finally { ttlFault?.mockRestore(); }
+  }, 30_000);
+
+  it('permanently fails closed after monotonic lease expiry instead of silently reacquiring', async () => {
+    const game = await room();
+    const original = await server!.store.client.db().collection('leases').findOne({ name: 'game-server' });
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 20_000);
+    try {
+      expect((await fetch(`${base}/api/health`)).status).toBe(503);
+    } finally { clock.mockRestore(); }
+    expect(server!.store.hasLease()).toBe(false);
+    expect(await server!.store.lease()).toBe(false);
+    expect((await server!.store.client.db().collection('leases').findOne({ name: 'game-server' }))?.until).toEqual(original?.until);
+    expect((await command(game.guessers[0]!, { type: 'guess', text: 'No mutation after expiry' })).code).toBe('RECOVERING');
+    expect((await fetch(`${base}/api/rooms`, { method: 'POST', headers: { cookie: game.host.cookie, origin: allowedOrigin, 'content-type': 'application/json' }, body: '{}' })).status).toBe(503);
+  });
+
+  it('separates trusted gateway clients while ignoring untrusted forwarded addresses', async () => {
+    expect(socketClientAddress('127.0.0.1', '203.0.113.20', false)).toBe('127.0.0.1');
+    expect(socketClientAddress('127.0.0.1', 'spoofed, 203.0.113.20', true)).toBe('203.0.113.20');
+    expect(socketClientAddress('127.0.0.1', 'not-an-ip', true)).toBe('127.0.0.1');
+    await server!.close(); server = undefined;
+    vi.stubEnv('TRUST_PROXY', 'true');
+    vi.stubEnv('SOCKET_CONNECTION_RATE', '1');
+    try {
+      await start();
+      const failure = async (address: string) => {
+        const socket = io(base, { transports: ['websocket'], autoConnect: false, reconnection: false, extraHeaders: { Origin: allowedOrigin, 'X-Forwarded-For': address } });
+        try {
+          const error = new Promise<Error>(resolve => socket.once('connect_error', resolve));
+          socket.connect();
+          return (await error).message;
+        } finally { socket.disconnect(); }
+      };
+      for (let index = 0; index < 6; index++) expect(await failure('203.0.113.20')).toContain('Choose your name');
+      expect(await failure('203.0.113.20')).toContain('Too many connections');
+      expect(await failure('203.0.113.21')).toContain('Choose your name');
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it('allows only one authoritative writer for a database', async () => {

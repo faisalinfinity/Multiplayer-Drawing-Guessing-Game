@@ -93,6 +93,8 @@ interface DrawingSample {
   expected: Set<string>;
   received: Set<string>;
   confirmed: boolean;
+  acknowledgementPending: boolean;
+  excludedPlanned: number;
 }
 interface ServerMetrics {
   commands: number;
@@ -124,7 +126,7 @@ const emulatedAck = new Histogram();
 const metricSamples: MetricSample[] = [];
 const errors: Record<string, number> = {};
 const setupErrors: string[] = [];
-const totals = { commands: 0, accepted: 0, rejected: 0, timedOut: 0, drawAttempted: 0, drawConfirmed: 0, expectedDeliveries: 0, receivedDeliveries: 0, duplicates: 0, reconnects: 0, unexpectedDisconnects: 0, connectionErrors: 0, metricsErrors: 0, setupRetries: 0 };
+const totals = { commands: 0, accepted: 0, rejected: 0, timedOut: 0, drawAttempted: 0, drawConfirmed: 0, expectedDeliveries: 0, receivedDeliveries: 0, excludedDuringPlannedDisconnects: 0, duplicates: 0, reconnects: 0, unexpectedDisconnects: 0, connectionErrors: 0, metricsErrors: 0, setupRetries: 0 };
 let running = false;
 let measuring = false;
 let stopping = false;
@@ -160,6 +162,7 @@ function confirm(sample: DrawingSample) {
   sample.confirmed = true;
   totals.drawConfirmed++;
   totals.expectedDeliveries += sample.expected.size;
+  totals.excludedDuringPlannedDisconnects += sample.excludedPlanned;
 }
 
 /** Both delays are scheduled, rather than merely added to a result after the fact. */
@@ -174,7 +177,7 @@ async function send(room: Room, player: Player, command: Command): Promise<Ack> 
   let sample: DrawingSample | undefined;
   if (command.type === 'draw') {
     sample = {
-      createdAt, emittedAt, measured, confirmed: false, received: new Set(),
+      createdAt, emittedAt, measured, confirmed: false, received: new Set(), acknowledgementPending: true, excludedPlanned: 0,
       expected: new Set(room.players.filter((other) => other !== player && other.socket.connected && !other.plannedOffline).map((other) => other.identity.id)),
     };
     drawingSamples.set(id, sample);
@@ -185,6 +188,7 @@ async function send(room: Room, player: Player, command: Command): Promise<Ack> 
       resolve({ ack: error || !ack ? { ok: false, code: 'ACK_TIMEOUT' } : ack, receivedAt: performance.now() });
     });
   }).catch(() => ({ ack: { ok: false, code: 'CLIENT_EMIT_EXCEPTION' } as Ack, receivedAt: performance.now() }));
+  if (sample) sample.acknowledgementPending = false;
   if (sample && response.ack.ok) confirm(sample);
   if (oneWayDelayMs) await sleep(oneWayDelayMs);
   if (measured) {
@@ -323,6 +327,13 @@ async function reconnectOne(room: Room) {
   if (!eligible.length) return;
   const player = eligible[room.reconnectIndex++ % eligible.length]!;
   player.plannedOffline = true;
+  // Cancel only genuinely in-flight expectations invalidated by our deliberate
+  // disconnect. An older missing event whose ACK arrived remains a real loss.
+  for (const sample of drawingSamples.values()) {
+    if (!sample.measured || !sample.acknowledgementPending || sample.received.has(player.identity.id) || !sample.expected.delete(player.identity.id)) continue;
+    sample.excludedPlanned++;
+    if (sample.confirmed) { totals.expectedDeliveries--; totals.excludedDuringPlannedDisconnects++; }
+  }
   player.socket.disconnect();
   totals.reconnects++;
   await sleep(1_000);
@@ -367,6 +378,8 @@ async function finish() {
   const durationSeconds = (measurementEnded - measurementStarted) / 1_000;
   const errorRate = totals.commands ? totals.rejected / totals.commands : 1;
   const deliveryRatio = totals.expectedDeliveries ? totals.receivedDeliveries / totals.expectedDeliveries : 0;
+  const expectedDeliveriesBeforePlannedExclusions = totals.expectedDeliveries + totals.excludedDuringPlannedDisconnects;
+  const deliveryRatioBeforePlannedExclusions = expectedDeliveriesBeforePlannedExclusions ? totals.receivedDeliveries / expectedDeliveriesBeforePlannedExclusions : 0;
   const expectedDrawBatches = rooms.reduce((sum, room) => sum + room.drawingMs / 1_000 * BATCHES_PER_SECOND, 0);
   const achievedWorkload = expectedDrawBatches ? totals.drawAttempted / expectedDrawBatches : 0;
   const roomWorkloads = rooms.map((room) => ({ roomId: room.id, drawAttempts: room.drawAttempts, drawingSeconds: room.drawingMs / 1_000, fractionOfMeasurementDrawing: room.drawingMs / Math.max(1, durationSeconds * 1_000) }));
@@ -395,7 +408,7 @@ async function finish() {
     actual: { rooms: rooms.length, players: rooms.reduce((n, room) => n + room.players.length, 0), durationSeconds, interrupted, expectedDrawBatches, achievedWorkload, averageDrawBatchesPerSecond: totals.drawAttempted / Math.max(1, durationSeconds), roomWorkloads },
     transport: { protocol: 'Socket.IO over websocket', measurement: 'Command creation to observer event callback; excludes browser canvas rendering', network: 'application-emulated delay, not physical network shaping', oneWayDelayMs, nominalRoundTripDelayMs: oneWayDelayMs * 2, baseMeasurement: 'Server/network receive timestamp minus actual socket emit timestamp', emulatedMeasurement: 'Delayed observer callback timestamp minus command creation timestamp', clock: 'shared monotonic performance.now across independent client sessions in one process' },
     latency: { observerBase: rawDelivery.summary(), observerWithEmulatedNetwork: emulatedDelivery.summary(), acknowledgementBase: rawAck.summary(), acknowledgementWithEmulatedNetwork: emulatedAck.summary() },
-    totals, errorCodes: errors, commandErrorRate: errorRate, deliveryRatio,
+    totals, errorCodes: errors, commandErrorRate: errorRate, deliveryRatio, expectedDeliveriesBeforePlannedExclusions, deliveryRatioBeforePlannedExclusions,
     server: { cpuBudgetCores, cpuPercentOfBudget: cpu, rssBytes: rss, memoryStability: { middleThirdMeanBytes: middleRss.mean, lastThirdMeanBytes: lastRss.mean, growthBytes: memoryGrowth, allowedGrowthBytes: memoryAllowance }, eventLoopP95Ms: stats(metricSamples.map((sample) => sample.server.eventLoopP95Ms)), intervalMeanDurableMs: stats(metricSamples.flatMap((sample) => sample.interval?.meanDurableMs !== null && sample.interval?.meanDurableMs !== undefined ? [sample.interval.meanDurableMs] : [])), samples: metricSamples },
     clientMachine: { hostname: hostname(), platform: platform(), release: release(), node: process.version, logicalCpus: cpus().length, cpuModel: cpus()[0]?.model, totalMemoryBytes: totalmem(), freeMemoryBytes: freemem(), clientRssBytes: process.memoryUsage().rss },
     setupErrors, criteria, passed: Object.values(criteria).every(Boolean),
@@ -443,9 +456,13 @@ if (!rooms.length || interrupted) {
   let nextMetrics = measurementStarted + 5_000;
   let nextReconnect = measurementStarted + 45_000;
   let nextLog = measurementStarted + 15_000;
-  while (running && performance.now() - measurementStarted < seconds * 1_000) {
+  const measurementDeadline = measurementStarted + seconds * 1_000;
+  while (running && performance.now() < measurementDeadline) {
     await sleep(100);
     const at = performance.now();
+    // In particular, a 45-second screen must not initiate its first reconnect
+    // on the final iteration after the measurement has already expired.
+    if (!running || at >= measurementDeadline) break;
     if (at >= nextMetrics) { nextMetrics = at + 5_000; void track(sampleMetrics()); }
     if (at >= nextReconnect) { nextReconnect = at + 45_000; for (const room of rooms) void track(reconnectOne(room)); }
     if (at >= nextLog) {

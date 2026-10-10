@@ -3,21 +3,22 @@ import cookie from '@fastify/cookie';
 import { Server, type Socket } from 'socket.io';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { commandSchema, identitySchema, type Ack, type DrawingEvent, type DrawingOp, type PlayerIdentity, type Snapshot } from '@doodle/shared';
+import { commandSchema, identitySchema, type Ack, type DrawingEvent, type DrawingOp, type PlayerIdentity, type Snapshot, type ReplayIndex } from '@doodle/shared';
 import { createRoom, joinRoom, applyCommand, advance, disconnectPlayer, publicState, privateState, type EngineState, type EngineResult } from './engine.js';
 import { GameStore, type JournalEntry } from './store.js';
-import { TokenBuckets } from './limits.js';
+import { INGRESS_BURST, INGRESS_RATE, INGRESS_STRIKES, TokenBuckets, socketClientAddress } from './limits.js';
 
 interface Actor {
   state: EngineState; seq: number; drawing: DrawingEvent[]; bytes: number;
   queue: Promise<unknown>; pending: number; recovering: boolean; lastCheckpoint: number;
-  receipts: Map<string, Ack>; sockets: Map<string, Socket>;
+  receipts: Map<string, Ack>; sockets: Map<string, Socket>; joining: Map<string, Socket>; offlineAt: Map<string, number>;
   stroke: { id: string; index: number; points: number; tool: string; color: string; size: number } | null;
   strokeIds: Set<string>;
 }
 export interface ServerOptions { mongoUri: string; origin?: string; logger?: boolean }
 export async function buildServer(options: ServerOptions) {
-  const app = Fastify({ logger: options.logger ?? true, bodyLimit: 16384, trustProxy: process.env.TRUST_PROXY === 'true', logController: new LogController({ disableRequestLogging: true }) });
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+  const app = Fastify({ logger: options.logger ?? true, bodyLimit: 16384, trustProxy, logController: new LogController({ disableRequestLogging: true }) });
   await app.register(cookie);
   const origins = new Set((options.origin ?? process.env.ORIGIN ?? 'http://localhost:3000').split(','));
   const store = new GameStore(options.mongoUri);
@@ -33,7 +34,14 @@ export async function buildServer(options: ServerOptions) {
     cors: { origin: [...origins], credentials: true },
     allowRequest: (request, callback) => callback(null, origins.has(request.headers.origin ?? '')),
   });
-  const makeActor = (state: EngineState, seq = 0, drawing: DrawingEvent[] = []): Actor => ({ state, seq, drawing, bytes: Buffer.byteLength(JSON.stringify(drawing)), queue: Promise.resolve(), pending: 0, recovering: false, lastCheckpoint: 0, receipts: new Map(), sockets: new Map(), stroke: null, strokeIds: new Set(drawing.flatMap(e => e.op.type === 'stroke' ? [e.op.strokeId] : [])) });
+  const makeActor = (state: EngineState, seq = 0, drawing: DrawingEvent[] = []): Actor => ({ state, seq, drawing, bytes: Buffer.byteLength(JSON.stringify(drawing)), queue: Promise.resolve(), pending: 0, recovering: false, lastCheckpoint: 0, receipts: new Map(), sockets: new Map(), joining: new Map(), offlineAt: new Map(), stroke: null, strokeIds: new Set(drawing.flatMap(e => e.op.type === 'stroke' ? [e.op.strokeId] : [])) });
+  function hasAuthority() {
+    if (closing || !store.hasLease()) { leaseHealthy = false; return false; }
+    return leaseHealthy;
+  }
+  function assertAuthority() {
+    if (!hasAuthority()) throw new Error('Server authority has expired. Restart this instance.');
+  }
   function enqueue<T>(actor: Actor, task: () => Promise<T>): Promise<T> {
     if (actor.pending >= 128) return Promise.reject(new Error('Room is busy. Please retry.'));
     actor.pending++;
@@ -56,16 +64,36 @@ export async function buildServer(options: ServerOptions) {
     io.to(actor.state.id).emit('status', { recovering: true, message: 'Connection to storage interrupted. Reconnecting safely…' });
   }
   async function recover(actor: Actor) {
+    assertAuthority();
     const loaded = await store.load(actor.state.id);
     if (!loaded) throw new Error('Room could not be restored');
     actor.state = loaded.state; actor.seq = loaded.seq; actor.drawing = loaded.drawing;
     actor.bytes = Buffer.byteLength(JSON.stringify(actor.drawing)); actor.stroke = null;
     actor.strokeIds = new Set(actor.drawing.flatMap(e => e.op.type === 'stroke' ? [e.op.strokeId] : []));
+    // A failed disconnect write must not resurrect a transport that no longer exists.
+    // Include an authenticated join currently committing, before its socket joins the room.
+    const reconciled = structuredClone(actor.state);
+    let changed = false;
+    const now = Date.now();
+    for (const player of reconciled.players) {
+      if (player.departed) continue;
+      const connected = Boolean(actor.sockets.get(player.id)?.connected || actor.joining.get(player.id)?.connected);
+      if (connected !== player.connected || (!connected && player.disconnectedAt === undefined)) {
+        changed = true;
+        player.connected = connected;
+        if (connected) delete player.disconnectedAt;
+        else player.disconnectedAt = actor.offlineAt.get(player.id) ?? now;
+      }
+    }
+    if (changed) await commit(actor, { state: reconciled, effects: [] });
+    assertAuthority();
     actor.recovering = false;
-    for (const [id, socket] of actor.sockets) socket.emit('snapshot', snapshot(actor, id));
+    publish(actor);
+    for (const [id, socket] of actor.sockets) if (socket.connected) socket.emit('snapshot', snapshot(actor, id));
     io.to(actor.state.id).emit('status', { recovering: false });
   }
   async function commit(actor: Actor, result: EngineResult, actorId = 'system', commandId: string = randomUUID()): Promise<Ack> {
+    assertAuthority();
     const ack: Ack = result.error ? { ok: false, code: result.error.code, error: result.error.message } : { ok: true, feedback: result.reply?.kind ?? 'ok', ...(result.reply?.points !== undefined ? { points: result.reply.points } : {}) };
     const changed = result.state !== actor.state;
     if (!changed && actorId === 'system') return ack;
@@ -75,6 +103,7 @@ export async function buildServer(options: ServerOptions) {
     const entry: JournalEntry = { roomId: next.id, seq, actorId, commandId, kind: 'state', gameId: next.gameId ?? actor.state.gameId, turnId: next.turn?.id ?? null, at: Date.now(), expiresAt: new Date(Date.now() + 8 * 86400000), state: next, effects: result.effects, ack };
     const start = performance.now();
     const saved = await store.append(entry);
+    assertAuthority();
     if (!saved.inserted) {
       // Also repairs a successful write whose acknowledgement was lost.
       if (saved.entry.seq > actor.seq) await recover(actor);
@@ -82,8 +111,10 @@ export async function buildServer(options: ServerOptions) {
     }
     const duration = performance.now() - start; metrics.commits++; metrics.durableMsTotal += duration; metrics.durableMsMax = Math.max(metrics.durableMsMax, duration);
     for (const effect of result.effects) if (effect.type === 'game-ended') {
-      await store.journal.updateMany({ roomId: next.id, gameId: effect.gameId }, { $set: { expiresAt: new Date(effect.endedAt + 7 * 86400000) } });
+      // Retention enforcement also checks the game end timestamp when reading replays.
+      try { assertAuthority(); await store.journal.updateMany({ roomId: next.id, gameId: effect.gameId }, { $set: { expiresAt: new Date(effect.endedAt + 7 * 86400000) } }); } catch { app.log.warn({ roomId: next.id }, 'Replay TTL cleanup deferred'); }
     }
+    assertAuthority();
     actor.state = next; actor.seq = seq;
     if (previousTurn !== next.turn?.id) { actor.drawing = []; actor.bytes = 0; actor.stroke = null; actor.strokeIds.clear(); }
     if (changed) publish(actor);
@@ -118,6 +149,7 @@ export async function buildServer(options: ServerOptions) {
     const entry: JournalEntry = { roomId: actor.state.id, seq: actor.seq + 1, actorId: playerId, commandId, kind: 'draw', gameId: actor.state.gameId, turnId, at: now, expiresAt: new Date(now + 8 * 86400000), drawing: event, ack };
     const start = performance.now();
     const saved = await store.append(entry);
+    assertAuthority();
     if (!saved.inserted) { if (saved.entry.seq > actor.seq) await recover(actor); return saved.entry.ack; }
     const duration = performance.now() - start; metrics.commits++; metrics.durableMsTotal += duration; metrics.durableMsMax = Math.max(metrics.durableMsMax, duration);
     actor.seq = entry.seq; actor.drawing.push(event); actor.bytes += size; actor.stroke = nextStroke;
@@ -126,6 +158,20 @@ export async function buildServer(options: ServerOptions) {
     io.to(actor.state.id).emit('drawing', event);
     return ack;
   }
+  let checkingLease = false;
+  const leaseTimer = setInterval(() => {
+    if (checkingLease || closing) return;
+    if (!store.hasLease()) { leaseHealthy = false; for (const actor of actors.values()) unavailable(actor); return; }
+    checkingLease = true;
+    void store.lease().then(healthy => {
+      leaseHealthy = healthy && store.hasLease();
+      if (!leaseHealthy) for (const actor of actors.values()) unavailable(actor);
+    }).catch(() => {
+      leaseHealthy = false;
+      for (const actor of actors.values()) unavailable(actor);
+    }).finally(() => { checkingLease = false; });
+    limits.sweep();
+  }, 5000);
   for (const id of await store.roomIds()) {
     const loaded = await store.load(id);
     if (!loaded || Date.now() - loaded.state.lastActiveAt > 3600000) continue;
@@ -138,13 +184,14 @@ export async function buildServer(options: ServerOptions) {
     await commit(actor, advance(actor.state, Date.now()));
   }
   app.addHook('onRequest', async (request, reply) => {
+    if (request.method === 'POST' && !hasAuthority()) return reply.code(503).send({ error: 'Server authority unavailable. Please reconnect after restart.' });
     if (request.headers.origin && !origins.has(request.headers.origin)) return reply.code(403).send({ error: 'Origin not allowed' });
     if (request.method === 'POST' && !limits.take(`http:${request.ip}`, Number(process.env.HTTP_RATE ?? 5), Number(process.env.HTTP_RATE ?? 5) * 6)) return reply.code(429).send({ error: 'Too many requests. Please wait.' });
     if (request.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
   });
   const playerFor = (request: { cookies: Record<string, string | undefined> }) => store.session(request.cookies.doodle_session);
   app.get('/api/health', async (_request, reply) => {
-    if (!leaseHealthy || closing || [...actors.values()].some(a => a.recovering)) return reply.code(503).send({ ok: false });
+    if (!hasAuthority() || [...actors.values()].some(a => a.recovering)) return reply.code(503).send({ ok: false });
     try { await store.client.db().command({ ping: 1 }); return { ok: true }; } catch { return reply.code(503).send({ ok: false }); }
   });
   // Metrics are only exposed when explicitly enabled for local operations/load measurement.
@@ -162,7 +209,7 @@ export async function buildServer(options: ServerOptions) {
   });
   app.post('/api/rooms', async (request, reply) => {
     const player = await playerFor(request); if (!player) return reply.code(401).send({ error: 'Choose your name first.' });
-    if (!leaseHealthy) return reply.code(503).send({ error: 'Server is recovering. Try again shortly.' });
+    if (!hasAuthority()) return reply.code(503).send({ error: 'Server is recovering. Try again shortly.' });
     if (!limits.take(`create:${request.ip}`, Number(process.env.ROOM_CREATE_RATE ?? 5) / 60, Number(process.env.ROOM_CREATE_RATE ?? 5))) return reply.code(429).send({ error: 'Please wait before creating another room.' });
     if (actors.size >= Number(process.env.MAX_ROOMS ?? 200)) return reply.code(503).send({ error: 'Server is full. Please try again later.' });
     const id = randomBytes(8).toString('base64url'); const state = createRoom(id, player, Date.now());
@@ -174,36 +221,58 @@ export async function buildServer(options: ServerOptions) {
     const actor = actors.get(request.params.roomId);
     return actor ? { roomId: actor.state.id, phase: actor.state.phase, players: actor.state.players.filter(p => !p.departed).length } : reply.code(404).send({ error: 'This room does not exist or has expired.' });
   });
-  async function replayMember(roomId: string, player: PlayerIdentity | null) {
-    if (!player) return false;
+  async function authorizedReplay(roomId: string, gameId: string, player: PlayerIdentity | null): Promise<{ allowed: boolean; replay: ReplayIndex | null }> {
+    if (!player) return { allowed: false, replay: null };
+    const replay = await store.replay(roomId, gameId);
     const state = actors.get(roomId)?.state ?? (await store.load(roomId))?.state;
-    return state?.players.some(p => p.id === player.id) && !state.bannedIds.includes(player.id);
+    const participants = replay?.players ?? state?.players ?? [];
+    return { allowed: participants.some(p => p.id === player.id) && !state?.bannedIds.includes(player.id), replay };
   }
   app.get<{ Params: { roomId: string; gameId: string } }>('/api/rooms/:roomId/games/:gameId', async (request, reply) => {
     const { roomId, gameId } = request.params;
-    if (!await replayMember(roomId, await playerFor(request))) return reply.code(403).send({ error: 'Only room participants can view replays.' });
-    const replay = await store.replay(roomId, gameId); return replay ?? reply.code(404).send({ error: 'Replay becomes available when the game ends.' });
+    const access = await authorizedReplay(roomId, gameId, await playerFor(request));
+    if (!access.allowed) return reply.code(403).send({ error: 'Only game participants can view replays.' });
+    return access.replay ?? reply.code(404).send({ error: 'Replay is unavailable or has expired.' });
   });
   app.get<{ Params: { roomId: string; gameId: string; turnId: string } }>('/api/rooms/:roomId/games/:gameId/turns/:turnId', async (request, reply) => {
     const { roomId, gameId, turnId } = request.params;
-    if (!await replayMember(roomId, await playerFor(request))) return reply.code(403).send({ error: 'Only room participants can view replays.' });
-    const drawing = await store.replayDrawing(roomId, gameId, turnId); return drawing ?? reply.code(404).send({ error: 'Drawing unavailable.' });
+    const access = await authorizedReplay(roomId, gameId, await playerFor(request));
+    if (!access.allowed) return reply.code(403).send({ error: 'Only game participants can view replays.' });
+    if (!access.replay) return reply.code(404).send({ error: 'Replay is unavailable or has expired.' });
+    const drawing = await store.replayDrawing(roomId, gameId, turnId, access.replay);
+    return drawing ?? reply.code(404).send({ error: 'Drawing unavailable.' });
   });
   io.use(async (socket, next) => {
     try {
-      const ip = socket.handshake.address;
+      const ip = socketClientAddress(socket.handshake.address, socket.request.headers['x-forwarded-for'], trustProxy);
       if (!limits.take(`socket:${ip}`, Number(process.env.SOCKET_CONNECTION_RATE ?? 5), Number(process.env.SOCKET_CONNECTION_RATE ?? 5) * 6)) return next(new Error('Too many connections. Please wait.'));
       const player = await store.session(app.parseCookie(socket.request.headers.cookie ?? '').doodle_session);
       const roomId = socket.handshake.auth.roomId;
       if (!player) return next(new Error('Choose your name before joining.'));
       if (typeof roomId !== 'string' || !actors.has(roomId)) return next(new Error('Room not found or expired.'));
-      if (closing || !leaseHealthy) return next(new Error('Server is restarting. Please reconnect.'));
+      if (!hasAuthority()) return next(new Error('Server is restarting. Please reconnect.'));
       socket.data.player = player; socket.data.roomId = roomId; next();
     } catch { next(new Error('Server is recovering. Please reconnect.')); }
   });
   io.on('connection', socket => {
     const player = socket.data.player as PlayerIdentity;
     const actor = actors.get(socket.data.roomId as string)!;
+    let ingressStrikes = 0;
+    let lastStrikeAt = 0;
+    // This transport-level guard runs before validation, receipt caching and unknown events.
+    socket.use((packet, next) => {
+      const now = Date.now();
+      if (!limits.take(`ingress:${socket.id}`, INGRESS_RATE, INGRESS_BURST, 1, now)) {
+        metrics.rejected++;
+        if (now - lastStrikeAt > 10000) ingressStrikes = 0;
+        lastStrikeAt = now;
+        const respond = packet.at(-1);
+        if (typeof respond === 'function') respond({ ok: false, code: 'RATE_LIMIT', error: 'Too many messages. Please slow down.' });
+        if (++ingressStrikes >= INGRESS_STRIKES) socket.disconnect(true);
+        return;
+      }
+      next();
+    });
     socket.on('command', (payload: unknown, respond: unknown) => {
       const ack = typeof respond === 'function' ? respond as (value: Ack) => void : () => undefined;
       const now = Date.now(); metrics.commands++;
@@ -217,7 +286,7 @@ export async function buildServer(options: ServerOptions) {
       void enqueue(actor, async () => {
         if (actor.sockets.get(player.id) !== socket || !socket.connected) return { ok: false, error: 'This session is no longer active.', code: 'SESSION' } as Ack;
         const prior = actor.receipts.get(key); if (prior) return prior;
-        if (actor.recovering || !leaseHealthy) return { ok: false, error: 'Reconnecting to storage. Please wait.', code: 'RECOVERING' } as Ack;
+        if (actor.recovering || !hasAuthority()) return { ok: false, error: 'Reconnecting to storage. Please wait.', code: 'RECOVERING' } as Ack;
         const durableReceipt = await store.journal.findOne({ roomId: actor.state.id, actorId: player.id, commandId: envelope.id }, { projection: { ack: 1 } });
         if (durableReceipt) { actor.receipts.set(key, durableReceipt.ack); return durableReceipt.ack; }
         const command = envelope.command;
@@ -227,30 +296,45 @@ export async function buildServer(options: ServerOptions) {
         return result;
       }).then(ack).catch(() => { unavailable(actor); ack({ ok: false, error: 'Reconnecting safely. Please retry shortly.', code: 'RECOVERING' }); });
     });
-    socket.on('sync', () => {
-      if (actor.sockets.get(player.id) !== socket || !limits.take(`${player.id}:sync`, 0.5, 3)) return;
-      void enqueue(actor, async () => { socket.emit('snapshot', snapshot(actor, player.id)); }).catch(() => undefined);
+    socket.on('sync', (respond?: unknown) => {
+      const ack = typeof respond === 'function' ? respond as (value: Ack) => void : () => undefined;
+      if (actor.sockets.get(player.id) !== socket) { ack({ ok: false, code: 'SESSION' }); return; }
+      if (!limits.take(`${player.id}:sync`, 0.5, 3)) { ack({ ok: false, code: 'RATE_LIMIT' }); return; }
+      if (actor.recovering || !hasAuthority()) { ack({ ok: false, code: 'RECOVERING' }); return; }
+      void enqueue(actor, async () => {
+        if (!socket.connected || actor.sockets.get(player.id) !== socket) { ack({ ok: false, code: 'SESSION' }); return; }
+        socket.emit('snapshot', snapshot(actor, player.id));
+        ack({ ok: true });
+      }).catch(() => ack({ ok: false, code: 'BUSY' }));
     });
     socket.on('disconnect', () => {
+      const disconnectedAt = Date.now();
+      if (actor.sockets.get(player.id) === socket) actor.offlineAt.set(player.id, disconnectedAt);
       void enqueue(actor, async () => {
-        if (actor.sockets.get(player.id) !== socket || closing) return;
+        if (actor.sockets.get(player.id) !== socket || !hasAuthority()) return;
         actor.sockets.delete(player.id); if (actor.state.turn?.drawerId === player.id) actor.stroke = null;
-        await commit(actor, disconnectPlayer(actor.state, player.id, Date.now()));
+        await commit(actor, disconnectPlayer(actor.state, player.id, disconnectedAt));
       }).catch(() => unavailable(actor));
     });
+    const joinedAt = Date.now();
     void enqueue(actor, async () => {
+      assertAuthority();
       if (actor.recovering) throw new Error('Room is recovering');
-      const result = joinRoom(actor.state, player, Date.now());
-      const ack = await commit(actor, result);
-      if (!ack.ok) { socket.emit('kicked', { message: ack.error }); socket.disconnect(true); return; }
-      const old = actor.sockets.get(player.id); actor.sockets.set(player.id, socket);
-      if (old && old !== socket) { old.emit('kicked', { message: 'Your room is open in another tab.' }); old.disconnect(true); }
-      await socket.join(actor.state.id); socket.emit('snapshot', snapshot(actor, player.id));
+      actor.joining.set(player.id, socket);
+      try {
+        const result = joinRoom(actor.state, player, joinedAt);
+        const ack = await commit(actor, result);
+        if (!ack.ok) { socket.emit('kicked', { message: ack.error }); socket.disconnect(true); return; }
+        const old = actor.sockets.get(player.id); actor.sockets.set(player.id, socket);
+        actor.offlineAt.delete(player.id);
+        if (old && old !== socket) { old.emit('kicked', { message: 'Your room is open in another tab.' }); old.disconnect(true); }
+        await socket.join(actor.state.id); socket.emit('snapshot', snapshot(actor, player.id));
+      } finally { if (actor.joining.get(player.id) === socket) actor.joining.delete(player.id); }
     }).catch(() => { socket.emit('kicked', { message: 'The room is reconnecting. Please try again.' }); socket.disconnect(true); });
   });
   let ticking = false;
   const tick = setInterval(() => {
-    if (closing || ticking || !leaseHealthy) return;
+    if (ticking || !hasAuthority()) return;
     ticking = true;
     void Promise.all([...actors.values()].map(actor => {
       if (actor.pending > 0) return Promise.resolve();
@@ -263,12 +347,6 @@ export async function buildServer(options: ServerOptions) {
       });
     })).finally(() => { ticking = false; });
   }, 250);
-  let checkingLease = false;
-  const leaseTimer = setInterval(() => {
-    if (checkingLease || closing) return; checkingLease = true;
-    void store.lease().then(healthy => { leaseHealthy = healthy; if (!healthy) for (const actor of actors.values()) unavailable(actor); }).catch(() => { leaseHealthy = false; for (const actor of actors.values()) unavailable(actor); }).finally(() => { checkingLease = false; });
-    limits.sweep();
-  }, 5000);
   async function close() {
     if (closing) return; closing = true; clearInterval(tick); clearInterval(leaseTimer); eventLoop.disable();
     await Promise.all([...actors.values()].map(actor => actor.queue));

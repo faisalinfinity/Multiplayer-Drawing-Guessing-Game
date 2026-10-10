@@ -1,3 +1,17 @@
+import { isIP } from 'node:net';
+
+export const INGRESS_RATE = 90;
+export const INGRESS_BURST = 120;
+export const INGRESS_STRIKES = 8;
+
+/** TRUST_PROXY requires the server port to be reachable only through the trusted gateway. */
+export function socketClientAddress(remote: string, forwarded: string | string[] | undefined, trustProxy: boolean): string {
+  if (!trustProxy || !forwarded) return remote;
+  // The shipped single Caddy gateway appends/replaces the actual peer at the right edge.
+  const address = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded).split(',').at(-1)?.trim();
+  return address && isIP(address) ? address : remote;
+}
+
 export class TokenBuckets {
   private buckets = new Map<string, { tokens: number; at: number }>();
   take(key: string, perSecond: number, burst: number, cost = 1, now = Date.now()) {

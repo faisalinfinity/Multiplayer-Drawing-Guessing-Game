@@ -227,7 +227,10 @@ export function DrawingCanvas({ events, turnId, canDraw, onDraw, disabled = fals
     <div className="canvas-stage" style={{ aspectRatio: '4 / 3', background: '#fff', position: 'relative', overflow: 'hidden' }}>
       <canvas ref={canvasRef} data-testid="drawing-canvas" width={WIDTH} height={HEIGHT} aria-label={enabled ? 'Drawing canvas. Use your pointer to draw.' : 'Live drawing canvas'} role="img" tabIndex={enabled ? 0 : -1}
         style={{ display: 'block', width: '100%', height: '100%', touchAction: enabled ? 'none' : 'auto', cursor: enabled ? 'crosshair' : 'default' }}
-        onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={finish} />
+        onPointerDown={pointerDown} onPointerMove={pointerMove}
+        onPointerUp={event => { if (event.pointerId === activeRef.current?.pointerId) finish(); }}
+        onPointerCancel={event => { if (event.pointerId === activeRef.current?.pointerId) finish(); }}
+        onLostPointerCapture={event => { if (event.pointerId === activeRef.current?.pointerId) finish(); }} />
     </div>
     {canDraw && <div className="drawing-toolbar" aria-label="Drawing tools" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '12px 14px' }}>
       <div className="tool-group" style={{ display: 'flex', gap: 4 }}>
