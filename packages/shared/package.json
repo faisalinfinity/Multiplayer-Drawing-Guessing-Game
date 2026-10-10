@@ -1,0 +1,6 @@
+{
+  "name": "@doodle/shared", "private": true, "version": "1.0.0", "type": "module",
+  "exports": { ".": "./src/index.ts", "./renderer": "./src/renderer.ts" },
+  "scripts": { "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": { "zod": "4.6.5" }
+}
