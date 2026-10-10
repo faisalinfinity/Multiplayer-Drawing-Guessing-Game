@@ -182,7 +182,7 @@ async function compose(sources: Source[]) {
     const safe = (value: string) => value.replaceAll('\\', '\\\\').replaceAll(':', '\\:').replaceAll("'", "\\'");
     decorations.push(`drawtext=fontfile='${safe(font)}':textfile='${safe(path)}':x=${x}:y=${y}:fontsize=${size}:fontcolor=${color}${range ? `:enable='between(t,${range[0]},${range[1] - 0.001})'` : ''}`);
   }
-  // Browser labels are editorial overlays; all three underlying views are unmodified recordings.
+  // Browser labels/captions are editorial overlays; every view comes from a real browser recording.
   await caption('ADA  /  GOOGLE CHROME', 980, 12, 17, '#766779');
   await caption('MILO  /  FIREFOX', 1740, 8, 11, '#766779');
   await caption('ZOE  /  WEBKIT', 1740, 458, 11, '#766779');

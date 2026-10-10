@@ -2,6 +2,8 @@
 
 A browser drawing-and-guessing game for 2–12 friends. Built with Next.js, TypeScript, an authoritative Node.js/Socket.IO server, and MongoDB. Original cream-and-ink styling, colorful avatars, and a responsive drawing board.
 
+![DoodleRoom home screen](artifacts/home.png)
+
 ## Run with one command
 
 With Docker Desktop running, execute from the repository root:
@@ -34,6 +36,8 @@ PORT=3100 ORIGIN=http://localhost:3100 docker compose up --build
 - [Measured server capacity](docs/capacity.md) and [reproducible load methodology](docs/load-methodology.md)
 - [Local development, deployment, persistence, and operations](docs/operations.md)
 - [Private-room Skribbl.io reference study](docs/reference-study.md)
+
+The recording contains real UI interactions in Chrome, Firefox, and WebKit. Its final WebKit panel holds the completed replay frame for 6.2 seconds to remove a capture glitch; gameplay and the other panels retain their original timing.
 
 ## Develop and verify
 
