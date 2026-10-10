@@ -122,6 +122,8 @@ SIGTERM/SIGINT shutdown drains room queues, closes sockets and HTTP, and release
 
 Restarting the game server reconstructs recently active rooms from MongoDB. Players receive a fresh 30-second window to reconnect with their existing cookie; saved scores and accepted strokes remain. Timers retain their original deadlines, and expired turns resolve before play resumes. During a storage outage, changes pause until the journal can be reconciled; do not delete data or reset the database to clear a recovery state.
 
+Use `docker compose restart server` for a controlled restart. Docker's explicit stop/kill commands can suppress automatic restarts; the [crash drill](validation.md) tested an unexpected Node process exit separately.
+
 Completed replays expire after seven days. Sessions, checkpoints, and unfinished data have eight-day cleanup windows; live abandoned rooms expire after an hour. MongoDB TTL cleanup is asynchronous. Room expiration does not immediately erase its retained replay documents.
 
 Back up MongoDB, not just application containers. Use the database provider's consistent snapshot/backup mechanism, define retention, and test a restore into an isolated database. For a standalone local backup, stop the game-server writer while taking a database backup so the journal and checkpoints form a coherent recovery source. Keep the named Docker volume across normal upgrades. A volume deletion, disk failure, or expired retention window cannot be repaired by restarting Node.js.

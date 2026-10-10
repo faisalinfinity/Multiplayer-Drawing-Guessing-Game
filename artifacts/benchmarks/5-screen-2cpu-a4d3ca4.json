@@ -1,0 +1,562 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-10T17:25:31.894Z",
+  "baseUrl": "http://localhost:5100",
+  "origin": "http://localhost:5100",
+  "requested": {
+    "rooms": 5,
+    "playersPerRoom": 8,
+    "seconds": 60,
+    "warmupSeconds": 5,
+    "batchesPerSecond": 30,
+    "pointsPerBatch": 8
+  },
+  "actual": {
+    "rooms": 5,
+    "players": 40,
+    "durationSeconds": 60.034242291999995,
+    "interrupted": false,
+    "expectedDrawBatches": 9005.04864375,
+    "achievedWorkload": 0.9966631336554905,
+    "averageDrawBatchesPerSecond": 149.49801408913567,
+    "roomWorkloads": [
+      {
+        "roomId": "DG8v0DUBnPg",
+        "drawAttempts": 1795,
+        "drawingSeconds": 60.033657625000004,
+        "fractionOfMeasurementDrawing": 0.9999902611080332
+      },
+      {
+        "roomId": "EjrvkbYWkac",
+        "drawAttempts": 1795,
+        "drawingSeconds": 60.033657625000004,
+        "fractionOfMeasurementDrawing": 0.9999902611080332
+      },
+      {
+        "roomId": "iz8_xdMMyXw",
+        "drawAttempts": 1795,
+        "drawingSeconds": 60.033657625000004,
+        "fractionOfMeasurementDrawing": 0.9999902611080332
+      },
+      {
+        "roomId": "TNg60uYVTI4",
+        "drawAttempts": 1795,
+        "drawingSeconds": 60.033657625000004,
+        "fractionOfMeasurementDrawing": 0.9999902611080332
+      },
+      {
+        "roomId": "ZZmdJ5F8dPo",
+        "drawAttempts": 1795,
+        "drawingSeconds": 60.033657625000004,
+        "fractionOfMeasurementDrawing": 0.9999902611080332
+      }
+    ]
+  },
+  "transport": {
+    "protocol": "Socket.IO over websocket",
+    "measurement": "Command creation to observer event callback; excludes browser canvas rendering",
+    "network": "application-emulated delay, not physical network shaping",
+    "oneWayDelayMs": 25,
+    "nominalRoundTripDelayMs": 50,
+    "baseMeasurement": "Server/network receive timestamp minus actual socket emit timestamp",
+    "emulatedMeasurement": "Delayed observer callback timestamp minus command creation timestamp",
+    "clock": "shared monotonic performance.now across independent client sessions in one process"
+  },
+  "latency": {
+    "observerBase": {
+      "count": 62631,
+      "meanMs": 92.69584653863173,
+      "p50Ms": 13,
+      "p95Ms": 585,
+      "p99Ms": 824,
+      "maxMs": 1081.7350000000006,
+      "quantizationMs": 1
+    },
+    "observerWithEmulatedNetwork": {
+      "count": 62631,
+      "meanMs": 144.36478634633048,
+      "p50Ms": 64,
+      "p95Ms": 639,
+      "p99Ms": 875,
+      "maxMs": 1132.8688329999986,
+      "quantizationMs": 1
+    },
+    "acknowledgementBase": {
+      "count": 9395,
+      "meanMs": 92.94764484204387,
+      "p50Ms": 13,
+      "p95Ms": 581,
+      "p99Ms": 825,
+      "maxMs": 1082.411,
+      "quantizationMs": 1
+    },
+    "acknowledgementWithEmulatedNetwork": {
+      "count": 9395,
+      "meanMs": 144.63800248121382,
+      "p50Ms": 65,
+      "p95Ms": 636,
+      "p99Ms": 877,
+      "maxMs": 1132.8776669999988,
+      "quantizationMs": 1
+    }
+  },
+  "totals": {
+    "commands": 9395,
+    "accepted": 9395,
+    "rejected": 0,
+    "timedOut": 0,
+    "drawAttempted": 8975,
+    "drawConfirmed": 8975,
+    "expectedDeliveries": 62631,
+    "receivedDeliveries": 62631,
+    "excludedDuringPlannedDisconnects": 1,
+    "duplicates": 0,
+    "reconnects": 5,
+    "unexpectedDisconnects": 0,
+    "connectionErrors": 0,
+    "metricsErrors": 0,
+    "setupRetries": 0
+  },
+  "errorCodes": {},
+  "commandErrorRate": 0,
+  "deliveryRatio": 1,
+  "expectedDeliveriesBeforePlannedExclusions": 62632,
+  "deliveryRatioBeforePlannedExclusions": 0.9999840337207817,
+  "server": {
+    "cpuBudgetCores": 2,
+    "cpuPercentOfBudget": {
+      "count": 12,
+      "mean": 31.292161824038796,
+      "min": 22.630696950468334,
+      "p95": 38.83173395741277,
+      "max": 38.83173395741277
+    },
+    "rssBytes": {
+      "count": 13,
+      "mean": 168521412.92307693,
+      "min": 156401664,
+      "p95": 179023872,
+      "max": 179023872
+    },
+    "memoryStability": {
+      "middleThirdMeanBytes": 166738944,
+      "lastThirdMeanBytes": 173294592,
+      "growthBytes": 6555648,
+      "allowedGrowthBytes": 67108864
+    },
+    "eventLoopP95Ms": {
+      "count": 13,
+      "mean": 29.518925769230766,
+      "min": 28.671999,
+      "p95": 31.129599,
+      "max": 31.129599
+    },
+    "intervalMeanDurableMs": {
+      "count": 12,
+      "mean": 5.729360057851113,
+      "min": 2.3445457367090126,
+      "p95": 10.532853520710333,
+      "max": 10.532853520710333
+    },
+    "samples": [
+      {
+        "elapsedSeconds": 0.0075097090000008394,
+        "server": {
+          "commands": 793,
+          "rejected": 0,
+          "drawingBatches": 743,
+          "durableMsTotal": 6621.9903769999655,
+          "durableMsMax": 172.54925100000037,
+          "commits": 833,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 156401664,
+          "cpu": {
+            "user": 7289552,
+            "system": 1328572
+          },
+          "eventLoopP95Ms": 29.376511,
+          "uptime": 20.902105551
+        }
+      },
+      {
+        "elapsedSeconds": 5.059448625,
+        "server": {
+          "commands": 1586,
+          "rejected": 0,
+          "drawingBatches": 1473,
+          "durableMsTotal": 14077.864525000008,
+          "durableMsMax": 949.9937500000015,
+          "commits": 1598,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 163639296,
+          "cpu": {
+            "user": 9675803,
+            "system": 1832949
+          },
+          "eventLoopP95Ms": 29.573119,
+          "uptime": 25.954599262
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 57.218189848754704,
+          "cpuPercentOfBudget": 28.609094924377352,
+          "commits": 765,
+          "meanDurableMs": 9.746240716339925
+        }
+      },
+      {
+        "elapsedSeconds": 10.124371917000001,
+        "server": {
+          "commands": 2378,
+          "rejected": 0,
+          "drawingBatches": 2258,
+          "durableMsTotal": 16454.630999000034,
+          "durableMsMax": 949.9937500000015,
+          "commits": 2418,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 164499456,
+          "cpu": {
+            "user": 12105747,
+            "system": 2242668
+          },
+          "eventLoopP95Ms": 29.294591,
+          "uptime": 31.018484723
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 56.06527160016858,
+          "cpuPercentOfBudget": 28.03263580008429,
+          "commits": 820,
+          "meanDurableMs": 2.898495700000031
+        }
+      },
+      {
+        "elapsedSeconds": 15.210650750000001,
+        "server": {
+          "commands": 3173,
+          "rejected": 0,
+          "drawingBatches": 3014,
+          "durableMsTotal": 19787.257840999995,
+          "durableMsMax": 949.9937500000015,
+          "commits": 3209,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 167079936,
+          "cpu": {
+            "user": 14743067,
+            "system": 2744580
+          },
+          "eventLoopP95Ms": 29.343743,
+          "uptime": 36.104376766
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 61.71962063173817,
+          "cpuPercentOfBudget": 30.859810315869083,
+          "commits": 791,
+          "meanDurableMs": 4.213181848293251
+        }
+      },
+      {
+        "elapsedSeconds": 20.200457584,
+        "server": {
+          "commands": 3963,
+          "rejected": 0,
+          "drawingBatches": 3773,
+          "durableMsTotal": 22289.333895999862,
+          "durableMsMax": 949.9937500000015,
+          "commits": 4003,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 167473152,
+          "cpu": {
+            "user": 17088138,
+            "system": 3169094
+          },
+          "eventLoopP95Ms": 29.294591,
+          "uptime": 41.095550352
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 55.50485403820345,
+          "cpuPercentOfBudget": 27.752427019101724,
+          "commits": 794,
+          "meanDurableMs": 3.1512292884129303
+        }
+      },
+      {
+        "elapsedSeconds": 25.242976249999998,
+        "server": {
+          "commands": 4753,
+          "rejected": 0,
+          "drawingBatches": 4528,
+          "durableMsTotal": 24668.962612000043,
+          "durableMsMax": 949.9937500000015,
+          "commits": 4793,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 166227968,
+          "cpu": {
+            "user": 19399154,
+            "system": 3579347
+          },
+          "eventLoopP95Ms": 29.032447,
+          "uptime": 46.137524438
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 53.96646359186724,
+          "cpuPercentOfBudget": 26.98323179593362,
+          "commits": 790,
+          "meanDurableMs": 3.012188248101495
+        }
+      },
+      {
+        "elapsedSeconds": 30.287626417,
+        "server": {
+          "commands": 5543,
+          "rejected": 0,
+          "drawingBatches": 5283,
+          "durableMsTotal": 29019.01803899999,
+          "durableMsMax": 949.9937500000015,
+          "commits": 5583,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 166739968,
+          "cpu": {
+            "user": 22588279,
+            "system": 4106860
+          },
+          "eventLoopP95Ms": 29.261823,
+          "uptime": 51.17655369
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 73.6748412072793,
+          "cpuPercentOfBudget": 36.83742060363965,
+          "commits": 790,
+          "meanDurableMs": 5.506399274683479
+        }
+      },
+      {
+        "elapsedSeconds": 35.302107709,
+        "server": {
+          "commands": 6333,
+          "rejected": 0,
+          "drawingBatches": 6038,
+          "durableMsTotal": 32016.716569000095,
+          "durableMsMax": 949.9937500000015,
+          "commits": 6373,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 166514688,
+          "cpu": {
+            "user": 24946636,
+            "system": 4565323
+          },
+          "eventLoopP95Ms": 29.032447,
+          "uptime": 56.196669359
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 56.173706430890434,
+          "cpuPercentOfBudget": 28.086853215445217,
+          "commits": 790,
+          "meanDurableMs": 3.7945551012659537
+        }
+      },
+      {
+        "elapsedSeconds": 40.342926834,
+        "server": {
+          "commands": 7123,
+          "rejected": 0,
+          "drawingBatches": 6793,
+          "durableMsTotal": 33868.907701000215,
+          "durableMsMax": 949.9937500000015,
+          "commits": 7163,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 169005056,
+          "cpu": {
+            "user": 26779880,
+            "system": 5013624
+          },
+          "eventLoopP95Ms": 28.671999,
+          "uptime": 61.23427532
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 45.26139390093667,
+          "cpuPercentOfBudget": 22.630696950468334,
+          "commits": 790,
+          "meanDurableMs": 2.3445457367090126
+        }
+      },
+      {
+        "elapsedSeconds": 45.37714575,
+        "server": {
+          "commands": 7913,
+          "rejected": 0,
+          "drawingBatches": 7548,
+          "durableMsTotal": 38796.52927800006,
+          "durableMsMax": 949.9937500000015,
+          "commits": 7958,
+          "rooms": 5,
+          "connected": 35,
+          "rss": 172937216,
+          "cpu": {
+            "user": 29596987,
+            "system": 5618790
+          },
+          "eventLoopP95Ms": 29.114367,
+          "uptime": 66.271566697
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 67.98021812526201,
+          "cpuPercentOfBudget": 33.99010906263101,
+          "commits": 795,
+          "meanDurableMs": 6.198266134591
+        }
+      },
+      {
+        "elapsedSeconds": 50.516678917,
+        "server": {
+          "commands": 8693,
+          "rejected": 0,
+          "drawingBatches": 8184,
+          "durableMsTotal": 45916.738258000245,
+          "durableMsMax": 949.9937500000015,
+          "commits": 8634,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 175751168,
+          "cpu": {
+            "user": 32830600,
+            "system": 6297449
+          },
+          "eventLoopP95Ms": 29.835263,
+          "uptime": 71.398203908
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 76.1211548379526,
+          "cpuPercentOfBudget": 38.0605774189763,
+          "commits": 676,
+          "meanDurableMs": 10.532853520710333
+        }
+      },
+      {
+        "elapsedSeconds": 55.500553709,
+        "server": {
+          "commands": 9483,
+          "rejected": 0,
+          "drawingBatches": 9046,
+          "durableMsTotal": 53463.717943000214,
+          "durableMsMax": 949.9937500000015,
+          "commits": 9536,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 175484928,
+          "cpu": {
+            "user": 36002981,
+            "system": 6995718
+          },
+          "eventLoopP95Ms": 30.785535,
+          "uptime": 76.395649744
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 77.66346791482555,
+          "cpuPercentOfBudget": 38.83173395741277,
+          "commits": 902,
+          "meanDurableMs": 8.366939783813713
+        }
+      },
+      {
+        "elapsedSeconds": 60.237089792,
+        "server": {
+          "commands": 10193,
+          "rejected": 0,
+          "drawingBatches": 9723,
+          "durableMsTotal": 59862.764786000276,
+          "durableMsMax": 949.9937500000015,
+          "commits": 10248,
+          "rooms": 5,
+          "connected": 40,
+          "rss": 179023872,
+          "cpu": {
+            "user": 38652887,
+            "system": 7645411
+          },
+          "eventLoopP95Ms": 31.129599,
+          "uptime": 81.130329246
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 69.66270164905237,
+          "cpuPercentOfBudget": 34.83135082452618,
+          "commits": 712,
+          "meanDurableMs": 8.987425341292221
+        }
+      }
+    ]
+  },
+  "clientMachine": {
+    "platform": "darwin",
+    "release": "25.6.0",
+    "node": "v25.5.0",
+    "logicalCpus": 10,
+    "cpuModel": "Apple M4",
+    "totalMemoryBytes": 17179869184,
+    "freeMemoryBytes": 153944064,
+    "clientRssBytes": 130580480
+  },
+  "setupErrors": [],
+  "criteria": {
+    "completeSetup": true,
+    "tenMinuteSustain": false,
+    "p95EmulatedDeliveryBelow150ms": false,
+    "commandErrorsBelowOnePercent": true,
+    "deliveryAtLeast999PerThousand": true,
+    "requestedWorkloadAtLeast95Percent": true,
+    "eachRoomDrawingAtLeast90PercentOfRun": true,
+    "cpuP95Below80PercentOfBudget": true,
+    "memoryStable": true,
+    "noUnexpectedDisconnects": true,
+    "metricsAvailable": true
+  },
+  "passed": false,
+  "recommendedRoomsWith30PercentHeadroom": null,
+  "limitations": [
+    "Node clients do not measure browser rendering or mobile CPU.",
+    "Application delays emulate latency only, not network jitter, bandwidth limits, loss or congestion.",
+    "Same-host client/server/database runs compete for CPU and memory; report the actual deployment topology separately.",
+    "CPU budget defaults to one logical core; LOAD_CPU_CORES must match an enforced or explicitly documented server allocation.",
+    "A passing short run is a screening result; only at least ten minutes qualifies a capacity estimate.",
+    "Retained rooms from previous runs contaminate memory/room counts: restart the isolated benchmark server/database between runs."
+  ],
+  "benchmarkEnvironment": {
+    "sourceCommit": "a4d3ca41910576a120511a66614027b9dde3df71",
+    "runtimeTrackedFilesMatchCommit": true,
+    "serverImage": "sha256:f94939f2c135786b971445bbd2d10ee7c8442779b62fb475b27feba401dd0ae0",
+    "serverNodeVersion": "v24.21.0",
+    "mongoVersion": "8.0.32",
+    "mongoImage": "mongo@sha256:d0d926f94df099bff534b7ee5b5986458131a22489dfff8664509af0c1e2ca9c",
+    "serverLimits": {
+      "cpuCores": 2,
+      "memoryBytes": 1073741824
+    },
+    "mongoLimits": {
+      "cpuCores": 2,
+      "memoryBytes": 2147483648
+    },
+    "host": {
+      "cpu": "Apple M4",
+      "logicalCores": 10,
+      "memoryBytes": 17179869184,
+      "macOSVersion": "26.6.2"
+    },
+    "docker": {
+      "engineVersion": "28.5.1",
+      "vmLogicalCores": 10,
+      "vmMemoryBytes": 8218034176,
+      "kernel": "6.10.14-linuxkit",
+      "architecture": "aarch64"
+    },
+    "topology": "Host Node25.5.0 load generator; Node24 server and MongoDB in separate CPU/memory-limited Docker Desktop containers on the same Mac; direct server port5100 bypasses Next.js/Caddy.",
+    "systemSleepPrevention": "caffeinate -i",
+    "databaseResetBeforeRun": true
+  }
+}
