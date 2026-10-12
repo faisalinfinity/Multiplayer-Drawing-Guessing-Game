@@ -1,0 +1,14 @@
+:80 {
+  @game path /api/* /socket.io/*
+  handle @game {
+    reverse_proxy server:4000
+  }
+  handle {
+    reverse_proxy web:3000
+  }
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy same-origin
+    X-Frame-Options DENY
+  }
+}

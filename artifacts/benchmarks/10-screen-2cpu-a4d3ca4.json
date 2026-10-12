@@ -1,0 +1,592 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-10T17:23:37.535Z",
+  "baseUrl": "http://localhost:5100",
+  "origin": "http://localhost:5100",
+  "requested": {
+    "rooms": 10,
+    "playersPerRoom": 8,
+    "seconds": 60,
+    "warmupSeconds": 5,
+    "batchesPerSecond": 30,
+    "pointsPerBatch": 8
+  },
+  "actual": {
+    "rooms": 10,
+    "players": 80,
+    "durationSeconds": 60.064709916,
+    "interrupted": false,
+    "expectedDrawBatches": 18019.247300099996,
+    "achievedWorkload": 0.999930779567025,
+    "averageDrawBatchesPerSecond": 299.97647579082667,
+    "roomWorkloads": [
+      {
+        "roomId": "3MbodI50m2w",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "40fMElr3H0c",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "5XXs5KCeqNg",
+        "drawAttempts": 1801,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "6CD8h-6efgM",
+        "drawAttempts": 1801,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "eFVMkuOqZWk",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "HtHo_2ZQEk0",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "rMe-s_GB-Y4",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "tmoh92jFM4U",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "U1n_inhylkg",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      },
+      {
+        "roomId": "ukiF5e8-HME",
+        "drawAttempts": 1802,
+        "drawingSeconds": 60.06415766699999,
+        "fractionOfMeasurementDrawing": 0.9999908057659684
+      }
+    ]
+  },
+  "transport": {
+    "protocol": "Socket.IO over websocket",
+    "measurement": "Command creation to observer event callback; excludes browser canvas rendering",
+    "network": "application-emulated delay, not physical network shaping",
+    "oneWayDelayMs": 25,
+    "nominalRoundTripDelayMs": 50,
+    "baseMeasurement": "Server/network receive timestamp minus actual socket emit timestamp",
+    "emulatedMeasurement": "Delayed observer callback timestamp minus command creation timestamp",
+    "clock": "shared monotonic performance.now across independent client sessions in one process"
+  },
+  "latency": {
+    "observerBase": {
+      "count": 125597,
+      "meanMs": 324.3704389376041,
+      "p50Ms": 80,
+      "p95Ms": 1405,
+      "p99Ms": 1783,
+      "maxMs": 2094.712499999994,
+      "quantizationMs": 1
+    },
+    "observerWithEmulatedNetwork": {
+      "count": 125597,
+      "meanMs": 375.299423190426,
+      "p50Ms": 131,
+      "p95Ms": 1455,
+      "p99Ms": 1835,
+      "maxMs": 2145.9736249999987,
+      "quantizationMs": 1
+    },
+    "acknowledgementBase": {
+      "count": 18858,
+      "meanMs": 325.77736395031303,
+      "p50Ms": 82,
+      "p95Ms": 1405,
+      "p99Ms": 1786,
+      "maxMs": 2160.745458000005,
+      "quantizationMs": 1
+    },
+    "acknowledgementWithEmulatedNetwork": {
+      "count": 18858,
+      "meanMs": 376.72215929727497,
+      "p50Ms": 133,
+      "p95Ms": 1456,
+      "p99Ms": 1838,
+      "maxMs": 2214.155792000005,
+      "quantizationMs": 1
+    }
+  },
+  "totals": {
+    "commands": 18858,
+    "accepted": 18858,
+    "rejected": 0,
+    "timedOut": 0,
+    "drawAttempted": 18018,
+    "drawConfirmed": 18018,
+    "expectedDeliveries": 125597,
+    "receivedDeliveries": 125597,
+    "excludedDuringPlannedDisconnects": 1,
+    "duplicates": 0,
+    "reconnects": 10,
+    "unexpectedDisconnects": 0,
+    "connectionErrors": 0,
+    "metricsErrors": 0,
+    "setupRetries": 0
+  },
+  "errorCodes": {},
+  "commandErrorRate": 0,
+  "deliveryRatio": 1,
+  "expectedDeliveriesBeforePlannedExclusions": 125598,
+  "deliveryRatioBeforePlannedExclusions": 0.9999920380897785,
+  "server": {
+    "cpuBudgetCores": 2,
+    "cpuPercentOfBudget": {
+      "count": 12,
+      "mean": 48.052427969391466,
+      "min": 41.973304733633945,
+      "p95": 53.18425615822399,
+      "max": 53.18425615822399
+    },
+    "rssBytes": {
+      "count": 13,
+      "mean": 179301139.69230768,
+      "min": 163987456,
+      "p95": 196329472,
+      "max": 196329472
+    },
+    "memoryStability": {
+      "middleThirdMeanBytes": 176703488,
+      "lastThirdMeanBytes": 188122112,
+      "growthBytes": 11418624,
+      "allowedGrowthBytes": 67108864
+    },
+    "eventLoopP95Ms": {
+      "count": 13,
+      "mean": 40.493685153846144,
+      "min": 38.633471,
+      "p95": 45.481983,
+      "max": 45.481983
+    },
+    "intervalMeanDurableMs": {
+      "count": 12,
+      "mean": 10.372576332092597,
+      "min": 4.910557329767024,
+      "p95": 17.05647714705932,
+      "max": 17.05647714705932
+    },
+    "samples": [
+      {
+        "elapsedSeconds": 0.05197891600000003,
+        "server": {
+          "commands": 1599,
+          "rejected": 0,
+          "drawingBatches": 1458,
+          "durableMsTotal": 23019.290007999938,
+          "durableMsMax": 136.2013339999994,
+          "commits": 1638,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 163987456,
+          "cpu": {
+            "user": 8833606,
+            "system": 1717830
+          },
+          "eventLoopP95Ms": 38.633471,
+          "uptime": 13.408842924
+        }
+      },
+      {
+        "elapsedSeconds": 5.106720791000001,
+        "server": {
+          "commands": 3199,
+          "rejected": 0,
+          "drawingBatches": 3029,
+          "durableMsTotal": 40040.30644599997,
+          "durableMsMax": 136.2013339999994,
+          "commits": 3279,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 168710144,
+          "cpu": {
+            "user": 13147173,
+            "system": 2606122
+          },
+          "eventLoopP95Ms": 38.633471,
+          "uptime": 18.463552009
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 102.91047750089115,
+          "cpuPercentOfBudget": 51.455238750445574,
+          "commits": 1641,
+          "meanDurableMs": 10.372343959780643
+        }
+      },
+      {
+        "elapsedSeconds": 10.159063125000001,
+        "server": {
+          "commands": 4785,
+          "rejected": 0,
+          "drawingBatches": 4532,
+          "durableMsTotal": 57997.58255900002,
+          "durableMsMax": 165.4892919999984,
+          "commits": 4852,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 169787392,
+          "cpu": {
+            "user": 17324970,
+            "system": 3528061
+          },
+          "eventLoopP95Ms": 40.173567,
+          "uptime": 23.516632594
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 100.93805333975617,
+          "cpuPercentOfBudget": 50.46902666987808,
+          "commits": 1573,
+          "meanDurableMs": 11.415941584869703
+        }
+      },
+      {
+        "elapsedSeconds": 15.177834625,
+        "server": {
+          "commands": 6360,
+          "rejected": 0,
+          "drawingBatches": 6041,
+          "durableMsTotal": 72757.66953500014,
+          "durableMsMax": 165.4892919999984,
+          "commits": 6431,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 172797952,
+          "cpu": {
+            "user": 21454684,
+            "system": 4422969
+          },
+          "eventLoopP95Ms": 40.632319,
+          "uptime": 28.535022722
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 100.11657235241734,
+          "cpuPercentOfBudget": 50.05828617620867,
+          "commits": 1579,
+          "meanDurableMs": 9.347743493350299
+        }
+      },
+      {
+        "elapsedSeconds": 20.209822250000002,
+        "server": {
+          "commands": 7940,
+          "rejected": 0,
+          "drawingBatches": 7560,
+          "durableMsTotal": 80560.54513199994,
+          "durableMsMax": 165.4892919999984,
+          "commits": 8020,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 173215744,
+          "cpu": {
+            "user": 24913781,
+            "system": 5188055
+          },
+          "eventLoopP95Ms": 39.354367,
+          "uptime": 33.568006432
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 83.94660946726789,
+          "cpuPercentOfBudget": 41.973304733633945,
+          "commits": 1589,
+          "meanDurableMs": 4.910557329767024
+        }
+      },
+      {
+        "elapsedSeconds": 25.283858958,
+        "server": {
+          "commands": 9530,
+          "rejected": 0,
+          "drawingBatches": 9075,
+          "durableMsTotal": 89315.41758499992,
+          "durableMsMax": 191.37383299999783,
+          "commits": 9605,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 174616576,
+          "cpu": {
+            "user": 28414942,
+            "system": 5973873
+          },
+          "eventLoopP95Ms": 38.633471,
+          "uptime": 38.64104081
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 84.48852948266847,
+          "cpuPercentOfBudget": 42.244264741334234,
+          "commits": 1585,
+          "meanDurableMs": 5.5235788347003
+        }
+      },
+      {
+        "elapsedSeconds": 30.327926958000003,
+        "server": {
+          "commands": 11110,
+          "rejected": 0,
+          "drawingBatches": 10540,
+          "durableMsTotal": 107478.3758410002,
+          "durableMsMax": 191.37383299999783,
+          "commits": 11140,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 176906240,
+          "cpu": {
+            "user": 32652665,
+            "system": 6905463
+          },
+          "eventLoopP95Ms": 40.140799,
+          "uptime": 43.685656312
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 102.4830156928891,
+          "cpuPercentOfBudget": 51.24150784644455,
+          "commits": 1535,
+          "meanDurableMs": 11.832546095114195
+        }
+      },
+      {
+        "elapsedSeconds": 35.3366075,
+        "server": {
+          "commands": 12685,
+          "rejected": 0,
+          "drawingBatches": 12095,
+          "durableMsTotal": 119262.97958200017,
+          "durableMsMax": 191.37383299999783,
+          "commits": 12765,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 182075392,
+          "cpu": {
+            "user": 36238526,
+            "system": 7779751
+          },
+          "eventLoopP95Ms": 40.009727,
+          "uptime": 48.694042398
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 89.0483823553865,
+          "cpuPercentOfBudget": 44.52419117769325,
+          "commits": 1625,
+          "meanDurableMs": 7.252063840615366
+        }
+      },
+      {
+        "elapsedSeconds": 40.364377375000004,
+        "server": {
+          "commands": 14265,
+          "rejected": 0,
+          "drawingBatches": 13605,
+          "durableMsTotal": 134243.38320099973,
+          "durableMsMax": 191.37383299999783,
+          "commits": 14345,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 184172544,
+          "cpu": {
+            "user": 39951055,
+            "system": 8697060
+          },
+          "eventLoopP95Ms": 40.173567,
+          "uptime": 53.720869483
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 92.08532043245108,
+          "cpuPercentOfBudget": 46.04266021622554,
+          "commits": 1580,
+          "meanDurableMs": 9.481268113290856
+        }
+      },
+      {
+        "elapsedSeconds": 45.402036458000005,
+        "server": {
+          "commands": 15847,
+          "rejected": 0,
+          "drawingBatches": 15115,
+          "durableMsTotal": 145402.06595500017,
+          "durableMsMax": 191.37383299999783,
+          "commits": 15935,
+          "rooms": 10,
+          "connected": 70,
+          "rss": 186798080,
+          "cpu": {
+            "user": 43664786,
+            "system": 9526336
+          },
+          "eventLoopP95Ms": 40.108031,
+          "uptime": 58.759007736
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 90.18091389571708,
+          "cpuPercentOfBudget": 45.09045694785854,
+          "commits": 1590,
+          "meanDurableMs": 7.018039467924808
+        }
+      },
+      {
+        "elapsedSeconds": 50.509591791,
+        "server": {
+          "commands": 17449,
+          "rejected": 0,
+          "drawingBatches": 16361,
+          "durableMsTotal": 168018.95465200083,
+          "durableMsMax": 307.6029169999965,
+          "commits": 17261,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 190300160,
+          "cpu": {
+            "user": 47866765,
+            "system": 10510109
+          },
+          "eventLoopP95Ms": 41.123839,
+          "uptime": 63.866115613
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 101.5309998992037,
+          "cpuPercentOfBudget": 50.76549994960185,
+          "commits": 1326,
+          "meanDurableMs": 17.05647714705932
+        }
+      },
+      {
+        "elapsedSeconds": 55.535579166000005,
+        "server": {
+          "commands": 19025,
+          "rejected": 0,
+          "drawingBatches": 17763,
+          "durableMsTotal": 191560.3735720007,
+          "durableMsMax": 307.6029169999965,
+          "commits": 18733,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 191217664,
+          "cpu": {
+            "user": 52065613,
+            "system": 11657329
+          },
+          "eventLoopP95Ms": 43.319295,
+          "uptime": 68.892161116
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 106.36851231644798,
+          "cpuPercentOfBudget": 53.18425615822399,
+          "commits": 1472,
+          "meanDurableMs": 15.992811766304266
+        }
+      },
+      {
+        "elapsedSeconds": 61.403399958,
+        "server": {
+          "commands": 20465,
+          "rejected": 0,
+          "drawingBatches": 19525,
+          "durableMsTotal": 217841.19026900065,
+          "durableMsMax": 307.6029169999965,
+          "commits": 20575,
+          "rooms": 10,
+          "connected": 80,
+          "rss": 196329472,
+          "cpu": {
+            "user": 56700831,
+            "system": 12840694
+          },
+          "eventLoopP95Ms": 45.481983,
+          "uptime": 74.759567243
+        },
+        "interval": {
+          "cpuPercentOfOneCore": 99.16088453029909,
+          "cpuPercentOfBudget": 49.58044226514954,
+          "commits": 1842,
+          "meanDurableMs": 14.267544352334388
+        }
+      }
+    ]
+  },
+  "clientMachine": {
+    "platform": "darwin",
+    "release": "25.6.0",
+    "node": "v25.5.0",
+    "logicalCpus": 10,
+    "cpuModel": "Apple M4",
+    "totalMemoryBytes": 17179869184,
+    "freeMemoryBytes": 115539968,
+    "clientRssBytes": 200638464
+  },
+  "setupErrors": [],
+  "criteria": {
+    "completeSetup": true,
+    "tenMinuteSustain": false,
+    "p95EmulatedDeliveryBelow150ms": false,
+    "commandErrorsBelowOnePercent": true,
+    "deliveryAtLeast999PerThousand": true,
+    "requestedWorkloadAtLeast95Percent": true,
+    "eachRoomDrawingAtLeast90PercentOfRun": true,
+    "cpuP95Below80PercentOfBudget": true,
+    "memoryStable": true,
+    "noUnexpectedDisconnects": true,
+    "metricsAvailable": true
+  },
+  "passed": false,
+  "recommendedRoomsWith30PercentHeadroom": null,
+  "limitations": [
+    "Node clients do not measure browser rendering or mobile CPU.",
+    "Application delays emulate latency only, not network jitter, bandwidth limits, loss or congestion.",
+    "Same-host client/server/database runs compete for CPU and memory; report the actual deployment topology separately.",
+    "CPU budget defaults to one logical core; LOAD_CPU_CORES must match an enforced or explicitly documented server allocation.",
+    "A passing short run is a screening result; only at least ten minutes qualifies a capacity estimate.",
+    "Retained rooms from previous runs contaminate memory/room counts: restart the isolated benchmark server/database between runs."
+  ],
+  "benchmarkEnvironment": {
+    "sourceCommit": "a4d3ca41910576a120511a66614027b9dde3df71",
+    "runtimeTrackedFilesMatchCommit": true,
+    "serverImage": "sha256:f94939f2c135786b971445bbd2d10ee7c8442779b62fb475b27feba401dd0ae0",
+    "serverNodeVersion": "v24.21.0",
+    "mongoVersion": "8.0.32",
+    "mongoImage": "mongo@sha256:d0d926f94df099bff534b7ee5b5986458131a22489dfff8664509af0c1e2ca9c",
+    "serverLimits": {
+      "cpuCores": 2,
+      "memoryBytes": 1073741824
+    },
+    "mongoLimits": {
+      "cpuCores": 2,
+      "memoryBytes": 2147483648
+    },
+    "host": {
+      "cpu": "Apple M4",
+      "logicalCores": 10,
+      "memoryBytes": 17179869184,
+      "macOSVersion": "26.6.2"
+    },
+    "docker": {
+      "engineVersion": "28.5.1",
+      "vmLogicalCores": 10,
+      "vmMemoryBytes": 8218034176,
+      "kernel": "6.10.14-linuxkit",
+      "architecture": "aarch64"
+    },
+    "topology": "Host Node25.5.0 load generator; Node24 server and MongoDB in separate CPU/memory-limited Docker Desktop containers on the same Mac; direct server port5100 bypasses Next.js/Caddy.",
+    "systemSleepPrevention": "caffeinate -i",
+    "databaseResetBeforeRun": true
+  }
+}

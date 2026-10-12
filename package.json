@@ -1,0 +1,32 @@
+{
+  "name": "doodleroom",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=24 <26"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm --filter @doodle/web build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "load": "tsx scripts/load.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
+    "@types/node": "24.19.2",
+    "eslint": "10.11.0",
+    "mongodb": "7.7.0",
+    "socket.io-client": "4.8.4",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0",
+    "vitest": "4.1.11"
+  }
+}
