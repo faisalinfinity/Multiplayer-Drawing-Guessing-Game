@@ -64,6 +64,7 @@ test('three browsers play a full match with private guesses, recovery, spectator
       const context = await browser.newContext({ viewport: { width: 1360, height: 960 }, reducedMotion: 'reduce' });
       await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
       const page = await context.newPage();
+      if (index === 0) await page.clock.install();
       page.on('pageerror', error => pageErrors.push(`${index}: ${error.message}`));
       players.push({ context, page, name: ['Maya', 'Leo', 'Nora'][index]!, browser: ['Chrome', 'Firefox', 'WebKit'][index]! });
     }
@@ -175,12 +176,28 @@ test('three browsers play a full match with private guesses, recovery, spectator
       await seek.press('End');
       await expect.poll(() => canvasHash(host.page, 'replay-canvas'), { message: 'replay final pixels match the completed live drawing' }).toBe(drawing.hash);
     }
-    await host.page.getByRole('slider', { name: 'Replay position' }).press('Home');
+    // Short later turns can finish before a real-time Pause click reaches the browser.
+    // Control only the replay clock after the complete live match and pixel checks.
+    const firstDrawing = drawings[0]!;
+    await host.page.getByRole('button', { name: `Replay ${firstDrawing.word} by ${firstDrawing.drawer}`, exact: true }).click();
+    await expect(host.page.locator('.replay-title')).toContainText(firstDrawing.drawer);
+    await host.page.clock.pauseAt(await host.page.evaluate(() => Date.now()) + 1000);
+    const seek = host.page.getByRole('slider', { name: 'Replay position' });
+    await seek.press('Home');
+    await expect(seek).toHaveValue('0');
+    const duration = Number(await seek.getAttribute('max'));
     await host.page.getByLabel('Playback speed').selectOption('4');
     await host.page.getByRole('button', { name: 'Play replay', exact: true }).click();
     await expect(host.page.getByRole('button', { name: 'Pause replay', exact: true })).toBeVisible();
-    await expect.poll(() => host.page.getByRole('slider', { name: 'Replay position' }).inputValue().then(Number)).toBeGreaterThan(0);
+    await host.page.clock.runFor(33);
+    await expect.poll(() => seek.inputValue().then(Number)).toBeGreaterThan(0);
+    expect(Number(await seek.inputValue())).toBeLessThan(duration);
     await host.page.getByRole('button', { name: 'Pause replay', exact: true }).click();
+    await expect(host.page.getByRole('button', { name: 'Play replay', exact: true })).toBeVisible();
+    const pausedPosition = await seek.inputValue();
+    await host.page.clock.runFor(1000);
+    await expect(seek).toHaveValue(pausedPosition);
+    await host.page.clock.resume();
     const screenshot = testInfo.outputPath('completed-game-gallery.png');
     await host.page.screenshot({ path: screenshot, fullPage: true });
     await testInfo.attach('Completed gallery', { path: screenshot, contentType: 'image/png' });

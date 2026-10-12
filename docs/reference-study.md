@@ -40,4 +40,4 @@ This study does **not** establish the reference's internal authority, transport 
 - [ ] Ordered drawing synchronization, late-join snapshot, and deterministic replay.
 - [ ] 30-second identity recovery, host succession, and drawer departure recovery.
 - [ ] Durable restart recovery, request limits, origin/session checks, and load report.
-- [ ] One-command startup and a two-minute recording of three browser players.
+- [ ] One-command startup.

@@ -15,7 +15,6 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
-    "demo": "tsx scripts/record-demo.ts",
     "load": "tsx scripts/load.ts"
   },
   "devDependencies": {
@@ -23,7 +22,6 @@
     "@playwright/test": "1.64.0",
     "@types/node": "24.19.2",
     "eslint": "10.11.0",
-    "ffmpeg-static": "5.3.0",
     "mongodb": "7.7.0",
     "socket.io-client": "4.8.4",
     "tsx": "4.23.15",

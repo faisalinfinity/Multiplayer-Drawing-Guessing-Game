@@ -6,7 +6,7 @@ Next.js renders the browser application. A separate Fastify/Socket.IO server own
 
 The engine advances `lobby → choosing → drawing → reveal → next turn → results`, waiting between turns when fewer than two players are connected. It automatically chooses after ten seconds, reveals hints at thirds of the drawing period, and scores by server receipt time. One correct guess awards `100 + floor(400 × remainingTime / drawTime)` to the guesser and 50 to the drawer in one persisted transition. Late joiners watch the current canvas, guess next turn, and draw next round.
 
-Public state uses an explicit allowlist. Choices and the selected answer go only to the drawer; custom words go only to the lobby host. Built-in words stay in the server package. A modified client cannot submit scores or retrieve another player's private state. Correct guesses become success announcements without the raw answer. Drawer/successful-guesser chat stays locked until reveal. One-edit near misses receive private feedback. Chat renders as text.
+Public state uses an explicit allowlist. Choices and the selected answer go only to the drawer; custom words go only to the lobby host. Built-in words stay in the server package. A modified client cannot submit scores or retrieve another player's private state. Correct guesses become success announcements without the raw answer. Drawer/successful-guesser chat stays locked until reveal. One-edit near misses receive private feedback for answers of at least four characters; shorter answers currently receive no near-miss feedback. Chat renders as text.
 
 ## Canvas synchronization and ordering
 

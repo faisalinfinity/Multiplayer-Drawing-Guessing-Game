@@ -9,5 +9,4 @@ playwright-report/
 !.env.example
 .DS_Store
 *.tsbuildinfo
-artifacts/raw/
 artifacts/load-*.json

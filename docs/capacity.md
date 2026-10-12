@@ -34,7 +34,7 @@ Without the emulated delay, observer p95/p99 were **15/58 ms**. With it, maximum
 Start only the isolated benchmark services with the checked-in allocation:
 
 ```sh
-docker compose -p doodleroom-benchmark -f compose.yaml -f compose.benchmark.yaml up --build -d mongo server
+docker compose -p doodleroom-benchmark -f compose.yaml -f compose.benchmark.yaml up --build -d --wait mongo server
 ```
 
 After `/api/health` on port 5100 is healthy:

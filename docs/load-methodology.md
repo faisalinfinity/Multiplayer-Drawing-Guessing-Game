@@ -4,25 +4,33 @@ The load client uses real guest-session HTTP requests, eight independent Socket.
 
 ## Running a measurement
 
-Use an isolated benchmark database. Enable `/api/metrics` on the game server with `ENABLE_METRICS=true`. Use the production game-server entrypoint, one authoritative server process, and a real MongoDB instance. The client can target the complete local stack at `http://localhost:3000`, or the game server directly on a separate port to isolate game-server capacity from Next.js rendering. Set the server's accepted `ORIGIN` to match the client's header.
-
-For fast setup from a single load-generator IP, set server `HTTP_RATE=1000`, `SOCKET_CONNECTION_RATE=1000`, and `ROOM_CREATE_RATE=1000`. These raise session/join/room-creation limits only. Keep all drawing, points, chat, payload-size, queue, and per-turn history limits unchanged. These elevated setup values belong only to the isolated load environment.
+Start with the optional Node.js/pnpm setup in [operations](operations.md#local-development-without-compose), and keep Docker running. From the repository root, start the supplied isolated benchmark stack:
 
 ```sh
-BASE_URL=http://localhost:3000 pnpm load --rooms 5 --seconds 60 --output artifacts/load-5-screen.json
+docker compose -p doodleroom-benchmark -f compose.yaml -f compose.benchmark.yaml up --build -d --wait mongo server
 ```
 
-Run increasing room counts, for example 1, 5, 10, 20, then smaller increments near the first failure. Reset the isolated benchmark database and restart its server between runs so retained rooms and previous drawings cannot contaminate memory measurements. Do not reset a normal development or production database. Sustain the highest passing screening workload for at least ten minutes:
+This starts a separate MongoDB volume and one production game server at `http://localhost:5100`, with metrics enabled and the resource limits used in the [capacity report](capacity.md). The override pins the server to the benchmark database, even if your shell or `.env` names a different MongoDB server. It also sets local HTTP cookie behavior and a 200-room admission ceiling for the test. These measurements address the game server directly and exclude the frontend and gateway.
+
+The benchmark override sets `HTTP_RATE=1000`, `SOCKET_CONNECTION_RATE=1000`, and `ROOM_CREATE_RATE=1000` for fast setup from a single load-generator IP. These raise session/join/room-creation limits only. Keep all drawing, points, chat, payload-size, queue, and per-turn history limits unchanged. These elevated setup values belong only to the isolated load environment.
 
 ```sh
-BASE_URL=http://localhost:3000 pnpm load --rooms 10 --seconds 600 --output artifacts/load-10-sustain.json
+BASE_URL=http://localhost:5100 ORIGIN=http://localhost:5100 LOAD_CPU_CORES=2 pnpm load --rooms 3 --seconds 60 --output artifacts/load-3-screen.json
 ```
 
-For a direct server on port 5000 whose configured origin is port 3000:
+Run increasing room counts, starting at one room and using small increments near the first failure. Reset the isolated benchmark database and restart its server between runs so retained rooms and previous drawings cannot contaminate memory measurements. Do not reset a normal development or production database. The previous highest passing sustained workload was three rooms; reproduce it with:
 
 ```sh
-BASE_URL=http://localhost:5000 ORIGIN=http://localhost:3000 pnpm load --rooms 10 --seconds 600 --output artifacts/load-10-sustain.json
+BASE_URL=http://localhost:5100 ORIGIN=http://localhost:5100 LOAD_CPU_CORES=2 pnpm load --rooms 3 --seconds 600 --output artifacts/load-3-sustain.json
 ```
+
+When you are finished, stop just the benchmark project:
+
+```sh
+docker compose -p doodleroom-benchmark -f compose.yaml -f compose.benchmark.yaml down
+```
+
+To deliberately reset its disposable database between measurements, add `--volumes` to that exact benchmark-project command, then run the startup command again. This deletes benchmark data. For a different isolated deployment, set `BASE_URL` to its address and `ORIGIN` to the origin accepted by that server; do not point load tests at a game people are using.
 
 `--warmup` defaults to five seconds. `--one-way-delay-ms` defaults to 25. `LOAD_CPU_CORES` defaults to one and defines the CPU budget used for qualification; set it to the server's documented/enforced allocation, not the load-generator machine's total core count. `pnpm load --help` lists supported arguments. The harness writes a report after an interrupt, marking it incomplete. A nonzero exit indicates failed setup or no confirmed drawings; read the report's `criteria` and `passed` fields to judge performance, including successful runs that exceed a threshold.
 

@@ -2,25 +2,55 @@
 
 ## Docker startup
 
-Start Docker Desktop or a Docker Engine with Compose support, then run:
+Install and start Docker Desktop, or use a running Docker Engine with Docker Compose v2 support. From the repository root, run this one command:
 
 ```sh
-docker compose up --build
+docker compose up --build -d --wait
 ```
 
-Open [localhost:3000](http://localhost:3000). The command builds the Next.js and game-server images, starts MongoDB, and routes browser traffic through Caddy. Only the gateway is published to the host. MongoDB remains on the Compose network and stores data in the named `mongo-data` volume.
+Once the command finishes successfully, open [localhost:3000](http://localhost:3000). The first run needs internet access to download images and dependencies and can take several minutes. Docker builds the Next.js and game-server images, starts MongoDB, and routes browser traffic through Caddy. `-d` keeps the game running in the background; `--wait` waits for services to be running or healthy. You do not need Node.js, pnpm, a separate MongoDB installation, or an `.env` file for this path. Only the gateway is published to the host. MongoDB remains on the Compose network and stores data in the named `mongo-data` volume.
+
+Create a room, copy its invite link, and open the link in two other browsers or independent browser profiles. Each player needs a separate cookie session; ordinary tabs in the same profile share one player identity. Chrome, Brave, and Safari can be used for a three-player game. The automated browser checks use Chrome, Firefox, and WebKit.
+
+Check the running services and game-server health:
+
+```sh
+docker compose ps
+curl --fail http://localhost:3000/api/health
+docker compose logs --tail=100
+```
+
+Follow application logs with `docker compose logs -f server web gateway`. Pressing Ctrl+C stops following the logs and leaves the game running.
 
 Use both a new gateway port and its matching allowed origin if port 3000 is occupied:
 
 ```sh
-PORT=3100 ORIGIN=http://localhost:3100 docker compose up --build
+PORT=3100 ORIGIN=http://localhost:3100 docker compose up --build -d --wait
 ```
 
-`docker compose down` preserves the database volume. `docker compose down --volumes` deletes that data and should only be used when intentionally discarding rooms, sessions, and replays. Configuration can be supplied through environment variables or a root `.env` file based on `.env.example`; the default local command requires neither.
+Then open [localhost:3100](http://localhost:3100) and use that port for health checks and browser tests. Keep both `PORT` and `ORIGIN` values together when recreating the stack. You can save them in a root `.env` file for repeated use.
+
+Stop the game with `docker compose down`. This preserves the database volume; run the startup command again to bring it back. Use `docker compose restart server` for a controlled game-server restart, or rerun the startup command after a code change to rebuild the images. `docker compose down --volumes` deletes the database and should only be used when intentionally discarding rooms, sessions, and replays.
+
+Configuration can be supplied through exported environment variables or a root `.env` file based on `.env.example`; the default local command requires neither. Exported shell variables take precedence over `.env` values. Inside Compose, `MONGODB_URI` must use the private service hostname, `mongodb://mongo:27017/doodleroom`, unless you deliberately configure an external database. A URI containing `localhost` or `127.0.0.1` points back to the game-server container, not the bundled MongoDB container. Do not copy the direct-development MongoDB URI below into the Compose configuration.
+
+### Startup troubleshooting
+
+- **Cannot connect to the Docker daemon:** start Docker Desktop or Docker Engine and wait until it is ready, then rerun the startup command. `docker info` confirms the daemon is reachable.
+- **Unknown `--wait` option:** update to a current Docker Compose v2 release. `docker compose version` shows the installed version.
+- **Port already allocated / address in use:** stop the process using port 3000, or use the matching `PORT=3100 ORIGIN=http://localhost:3100` command above.
+- **Startup reports an unhealthy service or fails while waiting:** run `docker compose ps` and `docker compose logs --tail=100 mongo server web gateway`. Check for a stale `.env` or exported `MONGODB_URI`, insufficient Docker resources, or failed image downloads. After correcting the cause, rerun the startup command. Keep the database volume while investigating.
+- **Page opens but joining fails:** check `/api/health`, ensure `ORIGIN` exactly matches the browser URL including its port, and use `localhost` consistently instead of switching between `localhost` and `127.0.0.1`.
+
+### Playing from another device
+
+`localhost` only works on the computer running Docker. To play from another computer or phone, serve the gateway at an HTTPS address that everyone can reach and that their browsers trust. Follow [production deployment](#production-deployment), set `ORIGIN` to that exact HTTPS address, and set `COOKIE_SECURE=true`. Everyone should open that address before creating or joining a room, so copied invitations use the right hostname.
+
+Do not simply replace `localhost` with a plain HTTP LAN address. The browser features used for command IDs and copying invite links need a secure context. Browsers allow local development at `http://localhost`; other devices need HTTPS for this app.
 
 ## Local development without Compose
 
-Use Node.js 24 LTS and pnpm 9.15.9:
+This optional path is for editing the code. Use Node.js 24 LTS and pnpm 9.15.9, and run the commands from the repository root:
 
 ```sh
 corepack enable
@@ -50,7 +80,11 @@ GAME_SERVER_URL=http://127.0.0.1:4100 NEXT_PUBLIC_SOCKET_URL=http://localhost:41
 
 Open [localhost:3100](http://localhost:3100). Next.js forwards `/api` to `GAME_SERVER_URL`, while the browser connects directly to `NEXT_PUBLIC_SOCKET_URL` for sockets. Keep browser and socket hostnames consistent (`localhost` in this example) so the session cookie reaches both ports. `NEXT_PUBLIC_SOCKET_URL` is a browser build-time setting; leave it unset for the same-origin Compose/production gateway. The game server does not automatically load a development `.env` file, so export variables or prefix the command as shown.
 
-## Checks, browsers, recording, and load
+The root `pnpm dev` command starts the web and server processes only; it does not start MongoDB or supply the separate ports and URLs above. Use the two explicit terminal commands for this setup. Stop each development process with Ctrl+C and stop its database with `docker stop doodleroom-dev-mongo` when finished.
+
+## Checks, browsers, and load
+
+After installing the optional local development dependencies above:
 
 ```sh
 pnpm check
@@ -65,7 +99,7 @@ MONGO_TEST_URI=mongodb://127.0.0.1:27018/doodleroom_test pnpm check
 
 The integration suite creates a unique temporary database per test and drops that database afterward. It exercises actual Socket.IO connections and journaled writes, including authorization, reconnect, restart, oversized payloads, and uncertain-write recovery. CI provides its own MongoDB service.
 
-Install Playwright browsers before browser acceptance or recording. The local suite uses installed Google Chrome plus Playwright Firefox and WebKit; CI uses bundled Chromium:
+Install Playwright browsers before browser acceptance tests. The local suite uses installed Google Chrome plus Playwright Firefox and WebKit; CI uses bundled Chromium:
 
 ```sh
 pnpm exec playwright install chromium firefox webkit
@@ -73,22 +107,15 @@ pnpm exec playwright install chromium firefox webkit
 
 Install Google Chrome locally if it is not already present, or run with `CI=1` to use bundled Chromium. On Linux, Playwright may also require system packages; `pnpm exec playwright install --with-deps chromium firefox webkit` installs them where supported.
 
-Against an already running application:
+Against the default Compose application that is already running:
 
 ```sh
-BASE_URL=http://localhost:3100 pnpm test:e2e
-BASE_URL=http://localhost:3100 pnpm demo
+BASE_URL=http://localhost:3000 pnpm test:e2e
 ```
 
-The multiplayer browser scenario opens independent Chrome, Firefox, and WebKit sessions, plays a complete match, checks identical canvas pixels, reconnects a guesser, verifies late-join behavior, and compares replay to the finished drawing. The mobile scenario checks the home/lobby layout and keyboard interaction. Failed browser runs retain traces and screenshots under `test-results`; the HTML report is under `playwright-report`. The demo script produces [the two-minute MP4](../artifacts/doodleroom-demo.mp4).
+Use `BASE_URL=http://localhost:3100` instead for the direct-development or alternate-port setup. This command does not start the application. The multiplayer browser scenario opens independent Chrome, Firefox, and WebKit sessions, plays a complete match, checks identical canvas pixels, reconnects a guesser, verifies late-join behavior, and compares replay to the finished drawing. The mobile scenario checks the home/lobby layout and keyboard interaction. Failed browser runs retain traces and screenshots under `test-results`; the HTML report is under `playwright-report`.
 
-Capacity measurement is separate from browser acceptance:
-
-```sh
-BASE_URL=http://localhost:3100 pnpm load --rooms 5 --seconds 600 --output artifacts/load-5.json
-```
-
-Read [load methodology](load-methodology.md) before running: use an isolated database/server, enable metrics, raise only setup-specific limits, reset between comparisons, and retain the JSON. [Capacity results](capacity.md) records measured hardware, outcomes, and headroom. A load test against a development database changes it by creating real rooms and events.
+Capacity measurement is separate from browser acceptance. Follow [load methodology](load-methodology.md) to prepare an isolated database/server, enable metrics, raise only setup-specific limits, run the benchmark commands, reset between comparisons, and retain the JSON. Do not point the load generator at the normal application: it creates real rooms and events. [Capacity results](capacity.md) records measured hardware, outcomes, and headroom.
 
 ## Production deployment
 
